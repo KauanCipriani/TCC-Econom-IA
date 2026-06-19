@@ -73,6 +73,15 @@ def aplicar_css() -> None:
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
+    /* Mantém visível o botão de reabrir a barra lateral quando ela é recolhida
+       (fica dentro do header oculto; sem isto a barra some e não volta) */
+    [data-testid="collapsedControl"],
+    [data-testid="stSidebarCollapsedControl"] {
+        visibility: visible !important;
+        display: block !important;
+        z-index: 999999 !important;
+    }
+
     /* Fundo principal escuro */
     .main { background-color: #0b0f14; }
     .stApp { background-color: #0b0f14; }
