@@ -68,18 +68,20 @@ ARQUIVO_OHLCV = DADOS_PATH / "b3_financeiro_ohlcv.parquet"
 def aplicar_css() -> None:
     st.markdown("""
     <style>
-    /* Esconde a barra padrão do Streamlit */
+    /* Esconde o menu, o rodapé e o header padrão do Streamlit. */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Mantém visível o botão de reabrir a barra lateral quando ela é recolhida
-       (fica dentro do header oculto; sem isto a barra some e não volta) */
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] {
+    /* Barra lateral FIXA: remove o botão de recolher, então ela permanece
+       sempre visível e nunca desaparece. */
+    [data-testid="stSidebarCollapseButton"],
+    [data-testid="stExpandSidebarButton"] { display: none !important; }
+    [data-testid="stSidebar"] {
+        transform: none !important;
         visibility: visible !important;
-        display: block !important;
-        z-index: 999999 !important;
+        min-width: 244px !important;
+        width: 244px !important;
     }
 
     /* Fundo principal escuro */
@@ -263,13 +265,74 @@ def aplicar_css() -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 # CARREGAMENTO DE DADOS
 # ─────────────────────────────────────────────────────────────────────────────
-@st.cache_data(show_spinner=False)
+# Mapeia os tickers da B3 para os símbolos do Yahoo Finance (sufixo .SA)
+TICKERS_YF = {
+    "ITUB4":  "ITUB4.SA",
+    "BBDC4":  "BBDC4.SA",
+    "BBAS3":  "BBAS3.SA",
+    "SANB11": "SANB11.SA",
+}
+
+
+@st.cache_data(ttl=900, show_spinner="Atualizando cotações da B3...")
+def baixar_dados_online() -> Optional[pd.DataFrame]:
+    """
+    Baixa o histórico diário ATUALIZADO das quatro ações direto do Yahoo
+    Finance (via yfinance) e calcula os indicadores técnicos. O resultado
+    fica em cache por 15 minutos (ttl=900), de modo que as cotações são
+    renovadas constantemente sem precisar reiniciar o aplicativo.
+
+    Retorna None se não houver conexão ou dados disponíveis.
+    """
+    try:
+        import yfinance as yf
+    except Exception:
+        return None
+
+    frames = []
+    for ticker, simbolo in TICKERS_YF.items():
+        try:
+            hist = yf.download(
+                simbolo, period="2y", interval="1d",
+                auto_adjust=True, progress=False, threads=False,
+            )
+        except Exception:
+            continue
+        if hist is None or hist.empty:
+            continue
+        # Com um único símbolo o yfinance pode devolver colunas MultiIndex
+        if isinstance(hist.columns, pd.MultiIndex):
+            hist.columns = hist.columns.get_level_values(0)
+        hist = hist.reset_index().rename(columns={
+            "Date": "data", "Open": "open", "High": "high",
+            "Low": "low", "Close": "close", "Volume": "volume",
+        })
+        hist["ticker"] = ticker
+        colunas = ["data", "open", "high", "low", "close", "volume", "ticker"]
+        frames.append(hist[colunas])
+
+    if not frames:
+        return None
+
+    df = pd.concat(frames, ignore_index=True)
+    df["data"] = pd.to_datetime(df["data"])
+    df = df.dropna(subset=["close"])
+    df = df.sort_values(["ticker", "data"]).reset_index(drop=True)
+    return adicionar_indicadores_basicos(df)
+
+
+@st.cache_data(ttl=900, show_spinner=False)
 def carregar_dados() -> tuple[Optional[pd.DataFrame], str]:
     """
-    Tenta carregar o dataset com features (Fase 2). Se não existir, carrega
-    o OHLCV bruto (Fase 1) e calcula indicadores básicos no momento.
-    Retorna (DataFrame, modo) onde modo é 'features', 'ohlcv' ou 'erro'.
+    Carrega os dados das ações. Primeiro tenta baixar cotações atualizadas
+    do Yahoo Finance (modo 'online'); se não houver conexão, recorre aos
+    arquivos Parquet locais ('features' ou 'ohlcv') como cópia de segurança.
+    Retorna (DataFrame, modo).
     """
+    df_online = baixar_dados_online()
+    if df_online is not None and not df_online.empty:
+        return df_online, "online"
+
     if ARQUIVO_FEATURES.exists():
         df = pd.read_parquet(ARQUIVO_FEATURES)
         df["data"] = pd.to_datetime(df["data"])
@@ -1851,273 +1914,6 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
         """, unsafe_allow_html=True)
 
 
-def tela_performance(modelos: dict, metricas: Optional[dict]) -> None:
-    st.markdown('<div class="page-title">📊 Performance & Validação dos Modelos</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="page-subtitle">Resultados reais do treinamento • Validação out-of-sample em SANB11</div>',
-        unsafe_allow_html=True,
-    )
-
-    if metricas is None:
-        st.warning(
-            "⚠️ **Nenhum modelo treinado ainda.** Execute o script `treinar_modelos.py` "
-            "para gerar as métricas reais. Enquanto isso, esta tela permanece sem dados."
-        )
-        with st.expander("Como treinar o modelo"):
-            st.code("python treinar_modelos.py", language="bash")
-            st.markdown(
-                "O script irá:\n"
-                "1. Carregar os dados de `dados/b3_financeiro_ohlcv.parquet`\n"
-                "2. Calcular os indicadores técnicos\n"
-                "3. Treinar o Random Forest com TimeSeriesSplit (5 folds)\n"
-                "4. Avaliar no conjunto de teste e em SANB11 (out-of-sample)\n"
-                "5. Salvar o modelo em `modelos/random_forest.pkl`\n"
-                "6. Salvar as métricas em `modelos/metricas.json`"
-            )
-        return
-
-    info = metricas["info_treinamento"]
-    teste = metricas["resultados_teste"]
-    oos = metricas["resultados_oos"]
-
-    # ── Info do treinamento ─────────────────────────────────────────────
-    st.markdown("### 📋 Informações do treinamento")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Modelo treinado", info["modelo"])
-    col2.metric("Tickers de treino", " + ".join(info["tickers_treino"]))
-    col3.metric("Out-of-sample", info["ticker_out_of_sample"])
-    col4.metric("Data do treinamento", info["data_treinamento"][:10])
-
-    col5, col6, col7, col8 = st.columns(4)
-    col5.metric("Registros treino", f"{info['n_registros_treino']:,}")
-    col6.metric("Registros teste", f"{info['n_registros_teste']:,}")
-    col7.metric("Registros OOS", f"{info['n_registros_oos']:,}")
-    col8.metric("CV folds", info["cv_folds"])
-
-    st.markdown("---")
-
-    # ── Banner de validação ─────────────────────────────────────────────
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#1e40af,#3b82f6); color:white; padding:24px; border-radius:10px; margin-bottom:20px;">
-        <div style="font-size:13px; opacity:0.9; font-weight:600;">🎯 VALIDAÇÃO OUT-OF-SAMPLE</div>
-        <div style="font-size:22px; font-weight:800; margin-top:8px;">Generalização em SANB11</div>
-        <div style="font-size:13px; opacity:0.92; margin-top:8px; line-height:1.6;">
-            A ação SANB11 foi reservada inteiramente como conjunto de teste. O modelo foi treinado apenas
-            com ITUB4, BBDC4 e BBAS3 e nunca viu SANB11 durante o aprendizado.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── Comparação Teste vs OOS ─────────────────────────────────────────
-    st.markdown("### 📈 Métricas reais — Conjunto de teste vs. Out-of-sample")
-
-    metricas_df = pd.DataFrame({
-        "Métrica": ["F1-Score (macro)", "Precision (macro)", "Recall (macro)", "Acurácia"],
-        "Teste (BBAS3/BBDC4/ITUB4)": [
-            f"{teste['f1_macro']:.4f}",
-            f"{teste['precision_macro']:.4f}",
-            f"{teste['recall_macro']:.4f}",
-            f"{teste['accuracy']:.4f}",
-        ],
-        "Out-of-Sample (SANB11)": [
-            f"{oos['f1_macro']:.4f}",
-            f"{oos['precision_macro']:.4f}",
-            f"{oos['recall_macro']:.4f}",
-            f"{oos['accuracy']:.4f}",
-        ],
-    })
-    st.dataframe(metricas_df, use_container_width=True, hide_index=True)
-
-    # Honestidade científica: aviso sobre os resultados atuais
-    f1_oos = oos["f1_macro"]
-    if f1_oos < 0.5:
-        st.info(
-            f"📝 **Nota sobre os resultados atuais (TC I — em andamento):** "
-            f"O F1-Score de {f1_oos:.3f} indica que o modelo, com os dados atuais "
-            f"e hiperparâmetros iniciais, ainda apresenta desempenho próximo de um classificador "
-            f"aleatório (chance = 0,333). Esse resultado é esperado nesta fase do trabalho. "
-            f"Para o TC II, estão previstas as seguintes melhorias:\n\n"
-            f"- Ajuste fino de hiperparâmetros (GridSearchCV)\n"
-            f"- Inclusão de features adicionais (volume, volatilidade, lags do retorno)\n"
-            f"- Comparação com SVM e LSTM (Fase 4)\n"
-            f"- Reavaliação do limiar de classificação (±1,5% atual)"
-        )
-
-    # ── CV scores ───────────────────────────────────────────────────────
-    st.markdown(f"### 🔄 Validação cruzada temporal (TimeSeriesSplit)")
-    st.markdown(
-        f"**F1-macro médio:** {info['cv_f1_medio']:.4f} (±{info['cv_f1_desvio']:.4f}) "
-        f"em {info['cv_folds']} folds sucessivos."
-    )
-
-    # ── Feature importance REAL ─────────────────────────────────────────
-    st.markdown("### 🎯 Importância real dos indicadores (Random Forest)")
-    fi = metricas["feature_importance"]
-    fi_df = pd.DataFrame({
-        "Indicador": list(fi.keys()),
-        "Importância (%)": [v * 100 for v in fi.values()],
-    })
-    fig_imp = go.Figure(go.Bar(
-        y=fi_df["Indicador"],
-        x=fi_df["Importância (%)"],
-        orientation="h",
-        marker=dict(color="#1e40af"),
-    ))
-    fig_imp.update_layout(
-        height=320, template="plotly_white",
-        xaxis_title="Importância relativa (%)",
-        yaxis=dict(autorange="reversed"),
-        margin=dict(l=20, r=20, t=20, b=40),
-    )
-    st.plotly_chart(fig_imp, use_container_width=True)
-
-    # ── Matriz de confusão real ─────────────────────────────────────────
-    st.markdown("### 🔢 Matriz de confusão — Out-of-sample (SANB11)")
-    cm = oos["matriz_confusao"]
-    labels = ["venda", "neutro", "compra"]
-    cm_df = pd.DataFrame(cm, index=[f"Real: {l}" for l in labels], columns=[f"Prev: {l}" for l in labels])
-    st.dataframe(cm_df.style.background_gradient(cmap="Blues", axis=None), use_container_width=True)
-
-
-def tela_dados_modelos(df: pd.DataFrame, modelos: dict, metricas: Optional[dict]) -> None:
-    """Tela que mostra ONDE as informações estão armazenadas (transparência arquitetural)."""
-    st.markdown('<div class="page-title">🗄️ Dados & Modelos — Armazenamento</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="page-subtitle">Onde cada informação fica armazenada no sistema</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        "Esta tela apresenta de forma transparente a estrutura de armazenamento "
-        "do projeto. O sistema **não utiliza banco de dados**: todas as informações "
-        "são persistidas em arquivos no formato Parquet (dados tabulares) e pickle "
-        "(modelos treinados), padrões da indústria em projetos de Ciência de Dados."
-    )
-
-    # ── Estrutura de pastas ─────────────────────────────────────────────
-    st.markdown("### 📁 Estrutura de armazenamento")
-    st.code("""projeto_tcc/
-├── dados/                          ← Datasets em formato Parquet
-│   ├── b3_financeiro_ohlcv.parquet     (saída Fase 1 — dados brutos)
-│   └── b3_financeiro_features.parquet  (saída Fase 2 — com indicadores)
-│
-├── modelos/                        ← Modelos treinados + métricas
-│   ├── random_forest.pkl               (Random Forest serializado)
-│   ├── svm.pkl                         (SVM — em desenvolvimento)
-│   ├── lstm.pt                         (LSTM PyTorch — TC II)
-│   ├── metricas.json                   (métricas reais do treinamento)
-│   └── feature_importance.json         (importância das features)
-│
-├── src/                            ← Scripts do pipeline
-│   ├── 01_coleta_dados.py
-│   ├── 02_features.py
-│   ├── 03_classificacao.py
-│   ├── 04_lstm_modelo.py
-│   └── 05_app.py                       (esta interface)
-│
-└── treinar_modelos.py              ← Pipeline completo de treinamento""", language="text")
-
-    # ── Status dos arquivos ─────────────────────────────────────────────
-    st.markdown("### 📊 Status atual dos arquivos")
-
-    arquivos = [
-        ("dados/b3_financeiro_ohlcv.parquet", DADOS_PATH / "b3_financeiro_ohlcv.parquet", "Dados brutos OHLCV"),
-        ("dados/b3_financeiro_features.parquet", DADOS_PATH / "b3_financeiro_features.parquet", "Features (indicadores)"),
-        ("modelos/random_forest.pkl", MODELOS_PATH / "random_forest.pkl", "Modelo Random Forest"),
-        ("modelos/svm.pkl", MODELOS_PATH / "svm.pkl", "Modelo SVM"),
-        ("modelos/lstm.pt", MODELOS_PATH / "lstm.pt", "Rede LSTM (TC II)"),
-        ("modelos/metricas.json", MODELOS_PATH / "metricas.json", "Métricas reais do treinamento"),
-    ]
-
-    status_rows = []
-    for caminho_str, caminho, descricao in arquivos:
-        if caminho.exists():
-            tamanho = caminho.stat().st_size
-            if tamanho >= 1024 * 1024:
-                tam_str = f"{tamanho / (1024*1024):.2f} MB"
-            elif tamanho >= 1024:
-                tam_str = f"{tamanho / 1024:.2f} KB"
-            else:
-                tam_str = f"{tamanho} B"
-            status_rows.append({
-                "Arquivo": caminho_str,
-                "Descrição": descricao,
-                "Status": "✅ Existe",
-                "Tamanho": tam_str,
-            })
-        else:
-            status_rows.append({
-                "Arquivo": caminho_str,
-                "Descrição": descricao,
-                "Status": "⏳ Pendente",
-                "Tamanho": "—",
-            })
-
-    st.dataframe(pd.DataFrame(status_rows), use_container_width=True, hide_index=True)
-
-    # ── Conteúdo do dataset principal ────────────────────────────────────
-    st.markdown("### 🔍 Amostra do dataset principal")
-    st.markdown(f"O DataFrame carregado possui **{len(df):,} registros** com as seguintes colunas:")
-    st.code(", ".join(df.columns.tolist()), language="text")
-    st.markdown("**Primeiras 10 linhas:**")
-    st.dataframe(df.head(10), use_container_width=True, hide_index=True)
-
-    st.markdown("**Estatísticas descritivas (variáveis numéricas):**")
-    st.dataframe(df.describe().round(3), use_container_width=True)
-
-    # ── Conteúdo do metricas.json ───────────────────────────────────────
-    if metricas:
-        st.markdown("### 📄 Conteúdo de `modelos/metricas.json`")
-        st.markdown(
-            "Este arquivo é gerado automaticamente ao final do treinamento e "
-            "consumido por esta interface. Contém todas as métricas reais "
-            "obtidas pelo modelo:"
-        )
-        with st.expander("Ver JSON completo"):
-            st.json(metricas)
-
-    # ── Como a IA aprende ───────────────────────────────────────────────
-    st.markdown("### 🧠 Como a IA aprende a partir desses dados?")
-    st.markdown("""
-    O processo de aprendizado segue cinco etapas executadas em sequência:
-
-    **1. Coleta** — O script `01_coleta_dados.py` consulta a API do Yahoo Finance
-    (biblioteca `yfinance`) e baixa o histórico OHLCV diário de cada ação no
-    período de 2019 a 2025. O resultado é salvo em `b3_financeiro_ohlcv.parquet`.
-
-    **2. Engenharia de atributos** — O script `02_features.py` lê o Parquet
-    bruto e calcula sete indicadores técnicos para cada pregão: RSI(14),
-    MACD(12,26,9), médias móveis simples e exponenciais (9, 21, 50 períodos)
-    e bandas de Bollinger(20). Os indicadores são normalizados como razões,
-    posições relativas e z-scores, tornando-os comparáveis entre diferentes
-    ações. O resultado é salvo em `b3_financeiro_features.parquet`.
-
-    **3. Criação do target** — Para cada linha, calcula-se o retorno percentual
-    no horizonte de cinco pregões à frente. Se o retorno for maior que +1,5%,
-    a linha recebe rótulo "compra"; se menor que −1,5%, rótulo "venda";
-    caso contrário, "neutro". O rótulo representa o que **deveria ter sido feito
-    cinco pregões atrás**, e é isso que o modelo tenta aprender a prever.
-
-    **4. Divisão temporal** — Os dados são separados em duas frentes: a ação
-    SANB11 é reservada inteiramente como validação out-of-sample (nunca usada
-    no treinamento) e o restante (ITUB4 + BBDC4 + BBAS3) é dividido em
-    70% treino e 30% teste, **respeitando a ordem cronológica** para evitar
-    que o modelo veja o futuro durante o aprendizado.
-
-    **5. Treinamento e avaliação** — O algoritmo Random Forest treina 150 árvores
-    de decisão, cada uma vendo subconjuntos diferentes dos dados. Durante o
-    treinamento, a validação cruzada temporal (TimeSeriesSplit com 5 folds)
-    avalia o modelo em janelas crescentes de tempo. Ao final, métricas como
-    F1-Score, Precision, Recall e Acurácia são calculadas tanto no conjunto
-    de teste (mesmos tickers, período futuro) quanto na SANB11 reservada
-    (ativo nunca visto), e gravadas em `metricas.json`.
-
-    Os modelos serializados (`.pkl` para o Random Forest, `.pt` para a LSTM
-    no TC II) ficam armazenados na pasta `modelos/`, prontos para serem
-    carregados por esta interface sem necessidade de retreinamento.
-    """)
-
-
 def tela_alertas(df: pd.DataFrame) -> None:
     st.markdown('<div class="page-title">🔔 Centro de Alertas e Histórico</div>', unsafe_allow_html=True)
     st.markdown(
@@ -2180,110 +1976,6 @@ def tela_alertas(df: pd.DataFrame) -> None:
         st.dataframe(df_filtrado, use_container_width=True, hide_index=True, height=500)
     else:
         st.info("Nenhum alerta no período analisado.")
-
-
-def tela_sobre() -> None:
-    st.markdown('<div class="page-title">ℹ️ Sobre o Projeto</div>', unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style="background:linear-gradient(135deg,#0f172a,#1e40af); color:white; padding:32px; border-radius:12px; margin-bottom:24px;">
-        <div style="display:inline-block; background:rgba(255,255,255,0.15); padding:6px 14px; border-radius:16px; font-size:12px; font-weight:600; margin-bottom:18px;">
-            🎓 TRABALHO DE CONCLUSÃO DE CURSO
-        </div>
-        <h2 style="font-size:24px; margin-bottom:12px; line-height:1.3;">
-            Sistema de Apoio à Decisão para Predição de Tendências de Ativos da B3 utilizando Machine Learning
-        </h2>
-        <p style="opacity:0.92; line-height:1.6; font-size:14px;">
-            Projeto desenvolvido como requisito parcial para a obtenção do grau de Bacharel em Ciência da Computação
-            na Universidade do Oeste de Santa Catarina (UNOESC), Campus de São Miguel do Oeste, no ano letivo de 2026.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        st.markdown("### 👥 Equipe Econom-IA")
-        sub_col1, sub_col2 = st.columns(2)
-        with sub_col1:
-            with st.container(border=True):
-                st.markdown("**Kauan Amélio Cipriani**")
-                st.caption("Autor • Ciência da Computação")
-                st.write("UNOESC São Miguel do Oeste — Engenharia de dados e modelagem de Machine Learning.")
-        with sub_col2:
-            with st.container(border=True):
-                st.markdown("**Vitor Hugo Konzen**")
-                st.caption("Autor • Ciência da Computação")
-                st.write("UNOESC São Miguel do Oeste — Desenvolvimento da interface e validação dos modelos.")
-
-        with st.container(border=True):
-            st.markdown("🎓 **Orientador**")
-            st.markdown("**Vinicius Almeida Santos**")
-            st.caption("Professor orientador — Departamento de Ciência da Computação UNOESC")
-
-    with col2:
-        with st.container(border=True):
-            st.markdown("### 📋 Informações")
-            st.write("**Instituição:** UNOESC")
-            st.write("**Campus:** São Miguel do Oeste")
-            st.write("**Curso:** Ciência da Computação")
-            st.write("**Ano letivo:** 2026")
-            st.write("**Disciplina:** TCC I & TCC II")
-            st.write("**Cidade:** Maravilha — SC")
-
-    st.markdown("### 🔄 Pipeline de Machine Learning")
-    st.markdown("""
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <div style="flex:1; min-width:180px; background:rgba(59,130,246,0.08); border:2px solid #3b82f6; padding:14px; border-radius:10px; text-align:center;">
-            <div style="font-size:24px;">📥</div>
-            <div style="font-size:11px; color:#64748b; font-weight:700;">FASE 1</div>
-            <div style="font-weight:700;">Coleta de Dados</div>
-        </div>
-        <div style="display:flex; align-items:center; color:#cbd5e1; font-size:20px;">→</div>
-        <div style="flex:1; min-width:180px; background:rgba(168,85,247,0.08); border:2px solid #a855f7; padding:14px; border-radius:10px; text-align:center;">
-            <div style="font-size:24px;">⚙️</div>
-            <div style="font-size:11px; color:#64748b; font-weight:700;">FASE 2</div>
-            <div style="font-weight:700;">Engenharia de Atributos</div>
-        </div>
-        <div style="display:flex; align-items:center; color:#cbd5e1; font-size:20px;">→</div>
-        <div style="flex:1; min-width:180px; background:rgba(245,158,11,0.08); border:2px solid #f59e0b; padding:14px; border-radius:10px; text-align:center;">
-            <div style="font-size:24px;">🌲</div>
-            <div style="font-size:11px; color:#64748b; font-weight:700;">FASE 3</div>
-            <div style="font-weight:700;">Classificação</div>
-        </div>
-        <div style="display:flex; align-items:center; color:#cbd5e1; font-size:20px;">→</div>
-        <div style="flex:1; min-width:180px; background:rgba(236,72,153,0.08); border:2px solid #ec4899; padding:14px; border-radius:10px; text-align:center;">
-            <div style="font-size:24px;">🧠</div>
-            <div style="font-size:11px; color:#64748b; font-weight:700;">FASE 4</div>
-            <div style="font-weight:700;">Predição LSTM</div>
-        </div>
-        <div style="display:flex; align-items:center; color:#cbd5e1; font-size:20px;">→</div>
-        <div style="flex:1; min-width:180px; background:rgba(16,185,129,0.08); border:2px solid #10b981; padding:14px; border-radius:10px; text-align:center;">
-            <div style="font-size:24px;">🖥️</div>
-            <div style="font-size:11px; color:#64748b; font-weight:700;">FASE 5</div>
-            <div style="font-weight:700;">Interface Web</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("### 🛠️ Stack Tecnológica")
-    tech_cols = st.columns(4)
-    techs = [
-        ("🐍", "Python 3.10+", "Linguagem principal"),
-        ("📊", "pandas + numpy", "Manipulação de dados"),
-        ("💰", "yfinance", "Coleta de dados B3"),
-        ("📈", "pandas-ta", "Indicadores técnicos"),
-        ("🤖", "scikit-learn", "Random Forest + SVM"),
-        ("🔥", "PyTorch", "Rede neural LSTM"),
-        ("🌐", "Streamlit", "Interface web"),
-        ("📉", "Plotly", "Gráficos interativos"),
-    ]
-    for i, (icon, nome, desc) in enumerate(techs):
-        with tech_cols[i % 4]:
-            with st.container(border=True):
-                st.markdown(f"### {icon}")
-                st.markdown(f"**{nome}**")
-                st.caption(desc)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2356,24 +2048,6 @@ def main() -> None:
             st.session_state.pagina_ativa = "alertas"
             st.rerun()
 
-        # ── Seção SISTEMA ────────────────────────────────────
-        st.markdown('<div class="sidebar-section-title">SISTEMA</div>', unsafe_allow_html=True)
-        if st.button("📈  Performance", key="btn_perf",
-                     use_container_width=True,
-                     type="primary" if st.session_state.pagina_ativa == "performance" else "secondary"):
-            st.session_state.pagina_ativa = "performance"
-            st.rerun()
-        if st.button("🗄️  Dados & Modelos", key="btn_dados",
-                     use_container_width=True,
-                     type="primary" if st.session_state.pagina_ativa == "dados" else "secondary"):
-            st.session_state.pagina_ativa = "dados"
-            st.rerun()
-        if st.button("ℹ️  Sobre o Projeto", key="btn_sobre",
-                     use_container_width=True,
-                     type="primary" if st.session_state.pagina_ativa == "sobre" else "secondary"):
-            st.session_state.pagina_ativa = "sobre"
-            st.rerun()
-
         st.markdown("---")
         st.markdown(
             """
@@ -2428,6 +2102,28 @@ def main() -> None:
                 """, unsafe_allow_html=True
             )
 
+        # Status / atualização dos dados de mercado
+        ultima_data = df["data"].max()
+        rotulo_modo = {
+            "online": "🟢 Dados ao vivo (Yahoo Finance)",
+            "features": "🟡 Dados locais (offline)",
+            "ohlcv": "🟡 Dados locais (offline)",
+        }.get(modo, "Dados de mercado")
+        st.markdown(
+            f"""
+            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3);
+                        padding:10px; border-radius:8px; margin-top:8px;">
+                <div style="font-size:11px; font-weight:700; color:#60a5fa;">{rotulo_modo}</div>
+                <div style="font-size:10px; color:#cbd5e1; margin-top:4px;">
+                    Última cotação: {ultima_data:%d/%m/%Y} · atualiza a cada 15 min
+                </div>
+            </div>
+            """, unsafe_allow_html=True
+        )
+        if st.button("🔄  Atualizar agora", key="btn_refresh", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
     # ── Roteamento ────────────────────────────────────────────────────────
     pagina = st.session_state.pagina_ativa
 
@@ -2443,12 +2139,6 @@ def main() -> None:
         tela_previsoes_macro()
     elif pagina == "alertas":
         tela_alertas(df)
-    elif pagina == "performance":
-        tela_performance(modelos, metricas)
-    elif pagina == "dados":
-        tela_dados_modelos(df, modelos, metricas)
-    elif pagina == "sobre":
-        tela_sobre()
 
 
 if __name__ == "__main__":
