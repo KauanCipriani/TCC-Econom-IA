@@ -292,8 +292,9 @@ def baixar_dados_online() -> Optional[pd.DataFrame]:
     frames = []
     for ticker, simbolo in TICKERS_YF.items():
         try:
+            # Histórico diário desde jan/2019 (conforme o TCC) até a data atual
             hist = yf.download(
-                simbolo, period="2y", interval="1d",
+                simbolo, start="2019-01-01", interval="1d",
                 auto_adjust=True, progress=False, threads=False,
             )
         except Exception:
@@ -368,9 +369,10 @@ def adicionar_indicadores_basicos(df: pd.DataFrame) -> pd.DataFrame:
         g["macd_signal"] = g["macd_line"].ewm(span=9, adjust=False).mean()
         g["macd_hist"] = g["macd_line"] - g["macd_signal"]
 
-        # SMAs
+        # Médias móveis simples (SMA) e exponenciais (EMA) de 9, 21 e 50 períodos
         for periodo in (9, 21, 50):
             g[f"sma_{periodo}"] = g["close"].rolling(periodo).mean()
+            g[f"ema_{periodo}"] = g["close"].ewm(span=periodo, adjust=False).mean()
 
         # Bandas de Bollinger
         sma20 = g["close"].rolling(20).mean()
@@ -381,6 +383,95 @@ def adicionar_indicadores_basicos(df: pd.DataFrame) -> pd.DataFrame:
 
         saida.append(g)
     return pd.concat(saida, ignore_index=True)
+
+
+def _formatar_br(valor: float, casas: int = 2) -> str:
+    """Formata um número no padrão brasileiro (1.234,56)."""
+    texto = f"{valor:,.{casas}f}"
+    return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def carregar_indicadores_macro() -> list:
+    """
+    Busca, ao vivo, os indicadores macroeconômicos exibidos na Visão Geral:
+      • IBOVESPA e USD/BRL  → Yahoo Finance (yfinance)
+      • SELIC (meta) e IPCA → API pública do Banco Central do Brasil (SGS)
+    O resultado fica em cache por 15 min (ttl=900), atualizando constantemente.
+    Retorna uma lista de tuplas (label, valor, unidade, delta, direção).
+    """
+    import json
+    import urllib.request
+
+    def yf_ultimo(simbolo: str):
+        try:
+            import yfinance as yf
+            h = yf.download(simbolo, period="5d", interval="1d",
+                            auto_adjust=True, progress=False, threads=False)
+            if h is None or h.empty:
+                return None
+            if isinstance(h.columns, pd.MultiIndex):
+                h.columns = h.columns.get_level_values(0)
+            fech = h["Close"].dropna()
+            if len(fech) < 2:
+                return None
+            atual, anterior = float(fech.iloc[-1]), float(fech.iloc[-2])
+            return atual, (atual / anterior - 1) * 100
+        except Exception:
+            return None
+
+    def bcb_serie(serie: int):
+        try:
+            url = (f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.{serie}"
+                   f"/dados/ultimos/1?formato=json")
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                dados = json.load(resp)
+            return float(dados[-1]["valor"])
+        except Exception:
+            return None
+
+    indices = []
+
+    # IBOVESPA (^BVSP)
+    ibov = yf_ultimo("^BVSP")
+    if ibov:
+        valor, var = ibov
+        direcao = "up" if var >= 0 else "down"
+        sinal = "+" if var >= 0 else ""
+        indices.append(("IBOVESPA", _formatar_br(valor, 0), "pts",
+                        f"{sinal}{_formatar_br(var, 2)}%", direcao))
+    else:
+        indices.append(("IBOVESPA", "—", "pts", "indisponível", "stable"))
+
+    # SELIC meta (BCB série 432)
+    selic = bcb_serie(432)
+    if selic is not None:
+        indices.append(("SELIC", _formatar_br(selic, 2), "% a.a.",
+                        "meta Copom", "stable"))
+    else:
+        indices.append(("SELIC", "—", "% a.a.", "indisponível", "stable"))
+
+    # USD/BRL (BRL=X)
+    usd = yf_ultimo("BRL=X")
+    if usd:
+        valor, var = usd
+        direcao = "up" if var >= 0 else "down"
+        sinal = "+" if var >= 0 else ""
+        indices.append(("USD/BRL", "R$ " + _formatar_br(valor, 2), "",
+                        f"{sinal}{_formatar_br(var, 2)}%", direcao))
+    else:
+        indices.append(("USD/BRL", "—", "", "indisponível", "stable"))
+
+    # IPCA acumulado em 12 meses (BCB série 13522)
+    ipca = bcb_serie(13522)
+    if ipca is not None:
+        indices.append(("IPCA", _formatar_br(ipca, 2), "% (12m)",
+                        "acum. 12 meses", "stable"))
+    else:
+        indices.append(("IPCA", "—", "% (12m)", "indisponível", "stable"))
+
+    return indices
 
 
 @st.cache_resource(show_spinner=False)
@@ -679,15 +770,10 @@ def tela_inicio(df: pd.DataFrame) -> None:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── 4 CARDS DE ÍNDICES MACROECONÔMICOS (placeholder) ──────────────
+    # ── 4 CARDS DE ÍNDICES MACROECONÔMICOS (ao vivo) ──────────────────
     col1, col2, col3, col4 = st.columns(4)
 
-    indices = [
-        ("IBOVESPA", "131.248", "pts", "+0,82%", "up"),
-        ("SELIC", "13,75", "% a.a.", "estável", "stable"),
-        ("USD/BRL", "R$ 5,14", "", "-0,38%", "down"),
-        ("IFNC", "18.430", "pts", "+1,21%", "up"),
-    ]
+    indices = carregar_indicadores_macro()
 
     for col, (label, valor, unit, delta, direcao) in zip([col1, col2, col3, col4], indices):
         delta_class = {"up": "indice-delta-up", "down": "indice-delta-down",
@@ -702,7 +788,7 @@ def tela_inicio(df: pd.DataFrame) -> None:
             </div>
             """, unsafe_allow_html=True)
 
-    st.caption("🔌 Integração de dados macroeconômicos via API — previsto para o TC II")
+    st.caption("Fontes ao vivo: Yahoo Finance (IBOVESPA, USD/BRL) e Banco Central do Brasil (SELIC, IPCA) · atualiza a cada 15 min")
     st.markdown("---")
 
     # ── LAYOUT EM 2 COLUNAS: NOTÍCIAS + SIDEBAR DIREITA ───────────────
@@ -710,89 +796,17 @@ def tela_inicio(df: pd.DataFrame) -> None:
 
     with col_noticias:
         st.markdown("### 📰 Últimas Notícias")
-        st.caption("Exemplos de manchetes — integração com APIs de notícias prevista para o TC II")
-
-        noticias = [
-            {
-                "tags": [("MACRO", "macro"), ("HOT", "hot")],
-                "tempo": "há 1h",
-                "titulo": "Copom mantém Selic em 13,75% e sinaliza estabilidade para o 2º semestre",
-                "resumo": "O Comitê de Política Monetária manteve a taxa básica pela terceira reunião consecutiva, indicando que não há pressa para cortes diante da inflação ainda acima da meta.",
-                "fonte": "Reuters Brasil",
-            },
-            {
-                "tags": [("BANCOS", "bancos"), ("HOT", "hot")],
-                "tempo": "há 2h",
-                "titulo": "ITUB4 sobe 1,87% após resultado do 2T26 superar estimativas com lucro de R$ 9,8 bi",
-                "resumo": "O Itaú Unibanco registrou lucro líquido recorrente de R$ 9,8 bilhões, superando o consenso de mercado em 6,3% e reforçando a liderança em eficiência no setor bancário.",
-                "fonte": "Bloomberg Brasil",
-            },
-            {
-                "tags": [("ANÁLISE", "analise")],
-                "tempo": "há 3h",
-                "titulo": "Analistas elevam preço-alvo do ITUB4 para R$ 42 e reiteram recomendação de compra",
-                "resumo": "Após o resultado do 2T26, três grandes casas de análise revisaram seus modelos e elevaram o preço-alvo, citando ROE acima de 22% e qualidade da carteira de crédito.",
-                "fonte": "Valor Econômico",
-            },
-            {
-                "tags": [("MERCADO", "mercado")],
-                "tempo": "há 4h",
-                "titulo": "IBOVESPA fecha em alta de 0,82% puxado pelo setor financeiro; IFNC avança 1,21%",
-                "resumo": "O índice da B3 encerrou o pregão em 131.248 pontos, com o índice financeiro liderando os ganhos em dia de apetite por risco nos mercados globais.",
-                "fonte": "InfoMoney",
-            },
-            {
-                "tags": [("BANCOS", "bancos")],
-                "tempo": "há 5h",
-                "titulo": "Banco do Brasil registra menor índice de inadimplência em 5 anos: 3,1% no 2T26",
-                "resumo": "O BB surpreendeu o mercado com a queda do NPL para 3,1%, refletindo maior seletividade na concessão de crédito e melhora do perfil da carteira agro.",
-                "fonte": "Reuters Brasil",
-            },
-            {
-                "tags": [("REGULATÓRIO", "regulatorio")],
-                "tempo": "há 6h",
-                "titulo": "Banco Central abre consulta pública sobre novas regras de provisão de crédito para 2027",
-                "resumo": "A autarquia busca alinhar o arcabouço prudencial brasileiro às recomendações do Comitê de Basileia IV, com impacto estimado de R$ 40 bi no setor bancário.",
-                "fonte": "Estadão Invest",
-            },
-            {
-                "tags": [("CÂMBIO", "cambio")],
-                "tempo": "há 7h",
-                "titulo": "Dólar recua 0,38% com melhora do sentimento global; real se fortalece ante pares emergentes",
-                "resumo": "A moeda americana fechou cotada a R$ 5,14, com o real superando peso mexicano e rand sul-africano em dia de descompressão dos juros norte-americanos.",
-                "fonte": "Reuters Brasil",
-            },
-            {
-                "tags": [("BANCOS", "bancos")],
-                "tempo": "há 8h",
-                "titulo": "Santander Brasil registra crescimento de 12% nas captações no 2T26; SANB11 sobe 2,1%",
-                "resumo": "O banco espanhol reportou expansão acelerada na carteira de pessoa física e ganho de market share em crédito imobiliário, segundo balanço divulgado hoje.",
-                "fonte": "Valor Econômico",
-            },
-        ]
-
-        # Renderiza em grid 2 colunas
-        for i in range(0, len(noticias), 2):
-            sub_col1, sub_col2 = st.columns(2)
-            for j, sub_col in enumerate([sub_col1, sub_col2]):
-                if i + j < len(noticias):
-                    n = noticias[i + j]
-                    tags_html = " ".join(
-                        f'<span class="news-tag news-tag-{cor}">{texto}</span>'
-                        for texto, cor in n["tags"]
-                    )
-                    with sub_col:
-                        st.markdown(f"""
-                        <div class="news-card">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <div>{tags_html}</div>
-                                <span style="font-size:11px; color:#64748b;">🕐 {n['tempo']}</span>
-                            </div>
-                            <div class="news-title">{n['titulo']}</div>
-                            <div class="news-resumo">{n['resumo']}</div>
-                            <div class="news-meta">{n['fonte']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+        st.markdown("""
+        <div style="background:linear-gradient(135deg, #2d1a4a 0%, #1a1530 100%);
+                    border:1px solid #6b21a8; border-radius:12px; padding:32px; text-align:center;">
+            <span class="economia-badge">🚧 EM DESENVOLVIMENTO · TC II</span>
+            <h3 style="color:#f1f5f9; margin-top:12px; font-size:20px;">Feed de notícias em construção</h3>
+            <p style="color:#cbd5e1; line-height:1.6; margin-top:8px; font-size:13px;">
+                A integração com APIs de notícias do mercado financeiro está prevista
+                para a entrega final do TCC (TC II).
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
     # ── SIDEBAR DIREITA: Acesso Rápido + Sinais de Hoje + EconomIA ────
     with col_lateral:
@@ -1915,67 +1929,24 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
 
 
 def tela_alertas(df: pd.DataFrame) -> None:
-    st.markdown('<div class="page-title">🔔 Centro de Alertas e Histórico</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">🔔 Centro de Alertas</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="page-subtitle">Acompanhe e analise todas as recomendações emitidas pelo sistema</div>',
+        '<div class="page-subtitle">Histórico e notificações de sinais — entrega prevista para o TC II</div>',
         unsafe_allow_html=True,
     )
 
-    # Gera histórico de alertas a partir das regras heurísticas
-    alertas = []
-    for ticker in TICKERS_INFO:
-        sub = df[df["ticker"] == ticker].tail(60).reset_index(drop=True)
-        for _, linha in sub.iterrows():
-            sinal, conf = gerar_sinal_heuristico(linha)
-            if sinal != "neutro":
-                alertas.append({
-                    "Data": linha["data"].strftime("%d/%m/%Y"),
-                    "Ativo": ticker,
-                    "Sinal": sinal.upper(),
-                    "Preço (R$)": f"{linha['close']:.2f}",
-                    "RSI": f"{linha.get('rsi_14', 0):.1f}" if not pd.isna(linha.get('rsi_14', np.nan)) else "—",
-                    "MACD Hist": f"{linha.get('macd_hist', 0):+.3f}" if not pd.isna(linha.get('macd_hist', np.nan)) else "—",
-                    "Confiança": f"{conf:.0f}%",
-                })
-
-    df_alertas = pd.DataFrame(alertas).tail(50).iloc[::-1].reset_index(drop=True)
-
-    # Stats
-    total = len(df_alertas)
-    compras = (df_alertas["Sinal"] == "COMPRA").sum() if total > 0 else 0
-    vendas = (df_alertas["Sinal"] == "VENDA").sum() if total > 0 else 0
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("📊 Total de alertas", total)
-    col2.metric("🟢 Sinais de compra", compras)
-    col3.metric("🔴 Sinais de venda", vendas)
-    col4.metric("📅 Período analisado", "60 dias")
-
-    # Filtros
-    st.markdown("---")
-    col_f1, col_f2 = st.columns([2, 2])
-    with col_f1:
-        ativo_filter = st.multiselect(
-            "Filtrar por ativo:",
-            options=list(TICKERS_INFO.keys()),
-            default=list(TICKERS_INFO.keys()),
-        )
-    with col_f2:
-        sinal_filter = st.multiselect(
-            "Filtrar por sinal:",
-            options=["COMPRA", "VENDA"],
-            default=["COMPRA", "VENDA"],
-        )
-
-    # Tabela filtrada
-    if total > 0:
-        df_filtrado = df_alertas[
-            df_alertas["Ativo"].isin(ativo_filter) &
-            df_alertas["Sinal"].isin(sinal_filter)
-        ]
-        st.dataframe(df_filtrado, use_container_width=True, hide_index=True, height=500)
-    else:
-        st.info("Nenhum alerta no período analisado.")
+    st.markdown("""
+    <div style="background:linear-gradient(135deg, #2d1a4a 0%, #1a1530 100%);
+                border:1px solid #6b21a8; border-radius:12px; padding:48px 32px;
+                text-align:center; margin-top:8px;">
+        <span class="economia-badge">🚧 EM DESENVOLVIMENTO · TC II</span>
+        <h2 style="color:#f1f5f9; margin-top:16px; font-size:24px;">Central de Alertas em construção</h2>
+        <p style="color:#cbd5e1; line-height:1.7; margin-top:8px; font-size:14px;">
+            O histórico de alertas e o envio de notificações de compra e venda
+            serão implementados na entrega final do TCC (TC II).
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
