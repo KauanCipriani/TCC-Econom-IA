@@ -8,7 +8,7 @@ Sistema computacional baseado em técnicas de Machine Learning para predição d
 **Orientador:** Vinicius Almeida Santos
 
 ---
-s
+
 ## 🚀 Como rodar (Passo a Passo)
 
 ### 1. Pré-requisitos
