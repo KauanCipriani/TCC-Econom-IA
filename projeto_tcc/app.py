@@ -64,6 +64,14 @@ PERIODOS_GRAFICO = {
     "Tudo (desde 2019)": None,
 }
 
+# Features na MESMA ordem usada no treinamento do Random Forest (treinar_modelos.py)
+FEATURES_MODELO = [
+    "rsi_14", "macd_hist_z",
+    "sma_9_ratio", "sma_21_ratio", "sma_50_ratio",
+    "ema_9_ratio", "ema_21_ratio",
+    "bb_position",
+]
+
 DADOS_PATH = Path("dados")
 MODELOS_PATH = Path("modelos")
 ARQUIVO_FEATURES = DADOS_PATH / "b3_financeiro_features.parquet"
@@ -389,6 +397,17 @@ def adicionar_indicadores_basicos(df: pd.DataFrame) -> pd.DataFrame:
         g["bb_middle"] = sma20
         g["bb_lower"] = sma20 - 2 * std20
 
+        # Features do modelo (razões e z-score), espelhando treinar_modelos.py
+        for periodo in (9, 21, 50):
+            g[f"sma_{periodo}_ratio"] = g["close"] / g[f"sma_{periodo}"] - 1
+        for periodo in (9, 21):
+            g[f"ema_{periodo}_ratio"] = g["close"] / g[f"ema_{periodo}"] - 1
+        g["bb_position"] = (g["close"] - g["bb_lower"]) / (g["bb_upper"] - g["bb_lower"])
+        g["macd_hist_z"] = (
+            (g["macd_hist"] - g["macd_hist"].rolling(60).mean())
+            / g["macd_hist"].rolling(60).std()
+        )
+
         saida.append(g)
     return pd.concat(saida, ignore_index=True)
 
@@ -544,6 +563,42 @@ def gerar_sinal_heuristico(linha: pd.Series) -> tuple[str, float]:
     return "neutro", 55.0
 
 
+def adicionar_sinais_modelo(df: pd.DataFrame, modelos: dict) -> pd.DataFrame:
+    """
+    Gera os sinais de compra/venda/neutro com o modelo Random Forest treinado,
+    adicionando as colunas 'sinal' e 'confianca' (0-100) ao DataFrame. As linhas
+    sem todas as features (warm-up dos indicadores) ficam sem sinal e recaem na
+    heurística via obter_sinal().
+    """
+    df = df.copy()
+    df["sinal"] = pd.NA
+    df["confianca"] = pd.NA
+
+    rf = modelos.get("rf")
+    if rf is None or not all(c in df.columns for c in FEATURES_MODELO):
+        return df
+
+    mask = df[FEATURES_MODELO].notna().all(axis=1)
+    if mask.any():
+        X = df.loc[mask, FEATURES_MODELO].values
+        df.loc[mask, "sinal"] = rf.predict(X)
+        df.loc[mask, "confianca"] = (rf.predict_proba(X).max(axis=1) * 100).round(0)
+    return df
+
+
+def obter_sinal(linha: pd.Series) -> tuple[str, float]:
+    """
+    Retorna (sinal, confiança). Usa a previsão do Random Forest (colunas 'sinal'
+    e 'confianca' geradas por adicionar_sinais_modelo). Se não houver previsão
+    para a linha (warm-up ou modelo ausente), recorre à heurística RSI/MACD.
+    """
+    sinal = linha.get("sinal")
+    conf = linha.get("confianca")
+    if isinstance(sinal, str) and conf is not None and not pd.isna(conf):
+        return sinal, float(conf)
+    return gerar_sinal_heuristico(linha)
+
+
 def previsao_lstm_demo(df_ticker: pd.DataFrame, dias: int) -> pd.DataFrame:
     """
     Previsão demo: extrapola tendência recente com pequena suavização e
@@ -598,7 +653,7 @@ def grafico_principal(df_ticker: pd.DataFrame, df_previsao: pd.DataFrame, ticker
         ))
 
     # Sinais de compra e venda (heurísticos)
-    sinais = df_recente.apply(lambda r: gerar_sinal_heuristico(r)[0], axis=1)
+    sinais = df_recente.apply(lambda r: obter_sinal(r)[0], axis=1)
     mask_compra = sinais == "compra"
     mask_venda = sinais == "venda"
 
@@ -850,7 +905,7 @@ def tela_inicio(df: pd.DataFrame) -> None:
             ultimo = sub.iloc[-1]
             anterior = sub.iloc[-2] if len(sub) > 1 else ultimo
             var = (ultimo["close"] - anterior["close"]) / anterior["close"] * 100
-            sinal, _ = gerar_sinal_heuristico(ultimo)
+            sinal, _ = obter_sinal(ultimo)
             contadores[sinal] += 1
 
             pill_class = f"pill-{'buy' if sinal == 'compra' else 'sell' if sinal == 'venda' else 'neutral'}"
@@ -1328,7 +1383,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
             sub = df[df["ticker"] == ticker]
             if sub.empty:
                 continue
-            sinal, conf = gerar_sinal_heuristico(sub.iloc[-1])
+            sinal, conf = obter_sinal(sub.iloc[-1])
             if sinal == "compra":
                 compras.append(f"<b>{ticker}</b> ({conf:.0f}% confiança)")
 
@@ -1346,7 +1401,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
             sub = df[df["ticker"] == ticker]
             if sub.empty:
                 continue
-            sinal, conf = gerar_sinal_heuristico(sub.iloc[-1])
+            sinal, conf = obter_sinal(sub.iloc[-1])
             if sinal == "venda":
                 vendas.append(f"<b>{ticker}</b> ({conf:.0f}% confiança)")
         if vendas:
@@ -1452,7 +1507,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
         ticker = tickers_mencionados[0]
         sub = df[df["ticker"] == ticker]
         if not sub.empty:
-            sinal, conf = gerar_sinal_heuristico(sub.iloc[-1])
+            sinal, conf = obter_sinal(sub.iloc[-1])
             preco = sub.iloc[-1]["close"]
             return (f"⚠️ <b>Importante:</b> o sistema não emite recomendações de compra ou venda. "
                    f"Posso te dizer apenas o que os indicadores estão mostrando agora: "
@@ -1467,7 +1522,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
         ticker = tickers_mencionados[0]
         sub = df[df["ticker"] == ticker]
         if not sub.empty:
-            sinal, conf = gerar_sinal_heuristico(sub.iloc[-1])
+            sinal, conf = obter_sinal(sub.iloc[-1])
             preco = sub.iloc[-1]["close"]
             return (f"📊 Sobre <b>{ticker}</b> ({TICKERS_INFO[ticker]['nome']}): preço atual "
                    f"R$ {preco:.2f}, sinal do modelo <b>{sinal.upper()}</b> "
@@ -1498,7 +1553,7 @@ def tela_visao_geral(df: pd.DataFrame, modo: str) -> None:
     for ticker in TICKERS_INFO:
         sub = df[df["ticker"] == ticker].tail(1)
         if not sub.empty:
-            sinal, _ = gerar_sinal_heuristico(sub.iloc[0])
+            sinal, _ = obter_sinal(sub.iloc[0])
             sinais_resumo[sinal] += 1
 
     col1.metric("🟢 Sugestões de compra hoje", sinais_resumo["compra"])
@@ -1516,7 +1571,7 @@ def tela_visao_geral(df: pd.DataFrame, modo: str) -> None:
         ultimo = sub.iloc[-1]
         anterior = sub.iloc[-2] if len(sub) > 1 else ultimo
         variacao = (ultimo["close"] - anterior["close"]) / anterior["close"] * 100
-        sinal, conf = gerar_sinal_heuristico(ultimo)
+        sinal, conf = obter_sinal(ultimo)
         cor_sinal = "🟢" if sinal == "compra" else "🔴" if sinal == "venda" else "⚪"
         descricao = {"compra": "Momento favorável",
                      "venda": "Sinal de cautela",
@@ -1550,7 +1605,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
         return
 
     ultimo = df_ticker.iloc[-1]
-    sinal, confianca = gerar_sinal_heuristico(ultimo)
+    sinal, confianca = obter_sinal(ultimo)
     df_previsao = previsao_lstm_demo(df_ticker, 7)
     preco_atual = float(ultimo["close"])
     preco_previsto = float(df_previsao["previsao"].iloc[-1]) if not df_previsao.empty else preco_atual
@@ -1696,7 +1751,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     # Pega os últimos 3 sinais que não foram neutros
     sinais_recentes = []
     for i in range(len(df_ticker) - 1, max(0, len(df_ticker) - 90), -1):
-        s, _ = gerar_sinal_heuristico(df_ticker.iloc[i])
+        s, _ = obter_sinal(df_ticker.iloc[i])
         if s != "neutro":
             sinais_recentes.append((df_ticker.iloc[i], s))
         if len(sinais_recentes) >= 3:
@@ -1757,7 +1812,7 @@ def _grafico_simples_iniciante(df_ticker: pd.DataFrame, df_previsao: pd.DataFram
     ))
 
     # Sinais (apenas alguns, pra não poluir)
-    sinais = df_recente.apply(lambda r: gerar_sinal_heuristico(r)[0], axis=1)
+    sinais = df_recente.apply(lambda r: obter_sinal(r)[0], axis=1)
     # Pega 1 sinal a cada 10 pra ficar limpo
     indices_compra = df_recente.index[sinais == "compra"][::8]
     indices_venda = df_recente.index[sinais == "venda"][::8]
@@ -1823,7 +1878,7 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
         return
 
     ultimo = df_ticker.iloc[-1]
-    sinal, confianca = gerar_sinal_heuristico(ultimo)
+    sinal, confianca = obter_sinal(ultimo)
     df_previsao = previsao_lstm_demo(df_ticker, dias_previsao)
     preco_previsto = float(df_previsao["previsao"].iloc[0]) if not df_previsao.empty else float(ultimo["close"])
 
@@ -2078,6 +2133,9 @@ def main() -> None:
 
     modelos = carregar_modelos()
     metricas = carregar_metricas()
+
+    # Gera os sinais de compra/venda/neutro com o Random Forest treinado
+    df = adicionar_sinais_modelo(df, modelos)
 
     # Status do modelo no rodapé da sidebar
     with st.sidebar:
