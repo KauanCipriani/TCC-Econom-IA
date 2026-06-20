@@ -56,6 +56,14 @@ TICKERS_INFO = {
     "SANB11": {"nome": "Santander Brasil",   "color": "#f59e0b"},
 }
 
+# Períodos selecionáveis nos gráficos (em pregões aprox.; None = todo o histórico)
+PERIODOS_GRAFICO = {
+    "Último mês": 22,
+    "Últimos 6 meses": 126,
+    "Último ano": 252,
+    "Tudo (desde 2019)": None,
+}
+
 DADOS_PATH = Path("dados")
 MODELOS_PATH = Path("modelos")
 ARQUIVO_FEATURES = DADOS_PATH / "b3_financeiro_features.parquet"
@@ -568,9 +576,10 @@ def previsao_lstm_demo(df_ticker: pd.DataFrame, dias: int) -> pd.DataFrame:
 # ─────────────────────────────────────────────────────────────────────────────
 # GRÁFICOS PLOTLY
 # ─────────────────────────────────────────────────────────────────────────────
-def grafico_principal(df_ticker: pd.DataFrame, df_previsao: pd.DataFrame, ticker: str) -> go.Figure:
+def grafico_principal(df_ticker: pd.DataFrame, df_previsao: pd.DataFrame, ticker: str,
+                      dias: Optional[int] = None) -> go.Figure:
     """Gráfico principal: histórico + médias móveis + previsão LSTM."""
-    df_recente = df_ticker.tail(180)
+    df_recente = df_ticker if dias is None else df_ticker.tail(dias)
     fig = go.Figure()
 
     # Preço histórico
@@ -1635,9 +1644,13 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
         """, unsafe_allow_html=True)
 
     # ── GRÁFICO SIMPLES ─────────────────────────────────────────────────
-    st.markdown("### 📊 Como a ação se comportou nos últimos meses?")
+    st.markdown("### 📊 Como a ação se comportou ao longo do tempo?")
 
-    fig = _grafico_simples_iniciante(df_ticker, df_previsao, ticker)
+    periodo_label = st.selectbox(
+        "Período do gráfico:", list(PERIODOS_GRAFICO.keys()),
+        index=3, key="periodo_iniciante",
+    )
+    fig = _grafico_simples_iniciante(df_ticker, df_previsao, ticker, PERIODOS_GRAFICO[periodo_label])
     st.plotly_chart(fig, use_container_width=True)
 
     # ── BOX "O QUE ISSO SIGNIFICA?" ──────────────────────────────────────
@@ -1729,9 +1742,10 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
         )
 
 
-def _grafico_simples_iniciante(df_ticker: pd.DataFrame, df_previsao: pd.DataFrame, ticker: str) -> go.Figure:
+def _grafico_simples_iniciante(df_ticker: pd.DataFrame, df_previsao: pd.DataFrame, ticker: str,
+                               dias: Optional[int] = None) -> go.Figure:
     """Gráfico simplificado para o modo iniciante — sem indicadores técnicos sobrepostos."""
-    df_recente = df_ticker.tail(120)
+    df_recente = df_ticker if dias is None else df_ticker.tail(dias)
     fig = go.Figure()
 
     # Preço histórico
@@ -1892,7 +1906,14 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
         ), unsafe_allow_html=True)
 
     # Gráfico principal
-    st.plotly_chart(grafico_principal(df_ticker, df_previsao, ticker), use_container_width=True)
+    periodo_label = st.selectbox(
+        "Período do gráfico:", list(PERIODOS_GRAFICO.keys()),
+        index=3, key="periodo_avancado",
+    )
+    st.plotly_chart(
+        grafico_principal(df_ticker, df_previsao, ticker, PERIODOS_GRAFICO[periodo_label]),
+        use_container_width=True,
+    )
 
     # Cenários de predição
     st.markdown("### 🔮 Cenários de predição (próximos pregões)")
