@@ -93,8 +93,12 @@ def aplicar_css() -> None:
     [data-testid="stExpandSidebarButton"] { display: none !important; }
     [data-testid="stSidebar"] {
         background-color: #0f1318; border-right: 1px solid #1f2430;
+        transform: none !important; visibility: visible !important;
         min-width: 244px !important; width: 244px !important;
     }
+    /* Garante o conteudo da sidebar sempre visivel */
+    [data-testid="stSidebar"][aria-expanded="false"] { margin-left: 0 !important; }
+    [data-testid="stSidebar"] > div { visibility: visible !important; }
 
     .stApp { background-color: #0b0f14; }
     .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; max-width: 1200px; }
