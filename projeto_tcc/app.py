@@ -84,196 +84,99 @@ ARQUIVO_OHLCV = DADOS_PATH / "b3_financeiro_ohlcv.parquet"
 def aplicar_css() -> None:
     st.markdown("""
     <style>
-    /* Esconde o menu, o rodapé e o header padrão do Streamlit. */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* Barra lateral FIXA: remove o botão de recolher, então ela permanece
-       sempre visível e nunca desaparece. */
+    /* Barra lateral fixa */
     [data-testid="stSidebarCollapseButton"],
     [data-testid="stExpandSidebarButton"] { display: none !important; }
     [data-testid="stSidebar"] {
-        transform: none !important;
-        visibility: visible !important;
-        min-width: 244px !important;
-        width: 244px !important;
+        background-color: #0f1318; border-right: 1px solid #1f2430;
+        min-width: 244px !important; width: 244px !important;
     }
 
-    /* Fundo principal escuro */
-    .main { background-color: #0b0f14; }
     .stApp { background-color: #0b0f14; }
-    .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; max-width: 1400px; }
-    [data-testid="stSidebar"] { background-color: #0f1318; border-right: 1px solid #1f2430; }
+    .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; max-width: 1200px; }
 
-    /* Header da página */
-    .page-title { font-size: 26px; font-weight: 800; color: #f1f5f9; margin-bottom: 4px; }
-    .page-subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+    .page-title { font-size: 22px; font-weight: 700; color: #f1f5f9; margin-bottom: 2px; }
+    .page-subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
 
-    /* Cards genéricos */
-    .custom-card {
-        background: #161a23; border: 1px solid #1f2430; border-radius: 10px;
-        padding: 20px; margin-bottom: 16px;
+    /* Cards planos */
+    .custom-card, .indice-card, .indicator-card, .news-card, .economia-card, .hero-welcome {
+        background: #161a23; border: 1px solid #1f2430; border-radius: 8px;
+        padding: 16px; margin-bottom: 12px;
     }
 
-    /* Hero — boas-vindas */
-    .hero-welcome {
-        background: linear-gradient(135deg, #1a1430 0%, #0f1218 100%);
-        border: 1px solid #2a2438;
-        border-radius: 14px;
-        padding: 32px;
-        margin-bottom: 24px;
-        position: relative; overflow: hidden;
-    }
-    .hero-welcome::before {
-        content: ''; position: absolute; right: -80px; top: -80px;
-        width: 260px; height: 260px; background: radial-gradient(circle, rgba(168,85,247,0.18), transparent);
-        border-radius: 50%;
-    }
-    .hero-date {
-        font-size: 13px; color: #94a3b8; font-weight: 500; margin-bottom: 8px;
-        position: relative; z-index: 1;
-    }
-    .hero-title {
-        font-size: 32px; font-weight: 800; color: #f1f5f9; line-height: 1.2;
-        position: relative; z-index: 1;
-    }
-    .hero-accent-up { color: #10b981; }
-    .hero-accent-down { color: #ef4444; }
-    .hero-accent-neutral { color: #f59e0b; }
+    /* Hero de boas-vindas (plano) */
+    .hero-welcome { padding: 20px; }
+    .hero-date { font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .hero-title { font-size: 22px; font-weight: 700; color: #f1f5f9; line-height: 1.3; }
+    .hero-accent-up { color: #16a34a; }
+    .hero-accent-down { color: #dc2626; }
+    .hero-accent-neutral { color: #94a3b8; }
 
-    /* Cards de índices macroeconômicos */
-    .indice-card {
-        background: rgba(22,26,35,0.6); border: 1px solid #1f2430;
-        border-radius: 10px; padding: 14px 18px;
-    }
-    .indice-label { font-size: 10px; color: #64748b; font-weight: 700; letter-spacing: 1px; }
-    .indice-value { font-size: 22px; font-weight: 800; color: #f1f5f9; margin: 4px 0; }
-    .indice-unit { font-size: 12px; color: #94a3b8; font-weight: 500; }
-    .indice-delta-up { font-size: 12px; color: #10b981; font-weight: 700; }
-    .indice-delta-down { font-size: 12px; color: #ef4444; font-weight: 700; }
-    .indice-delta-stable { font-size: 12px; color: #94a3b8; font-weight: 500; }
+    /* Indices macro */
+    .indice-label { font-size: 11px; color: #64748b; font-weight: 600; }
+    .indice-value { font-size: 20px; font-weight: 700; color: #f1f5f9; margin: 4px 0; }
+    .indice-unit { font-size: 12px; color: #94a3b8; font-weight: 400; }
+    .indice-delta-up { font-size: 12px; color: #16a34a; font-weight: 600; }
+    .indice-delta-down { font-size: 12px; color: #dc2626; font-weight: 600; }
+    .indice-delta-stable { font-size: 12px; color: #94a3b8; }
 
-    /* Banner de alerta — COMPRA / VENDA / NEUTRO */
-    .alert-banner-buy {
-        background: linear-gradient(135deg, #0f3a24, #14532d);
-        border: 1px solid #16a34a;
-        color: #d1fae5; padding: 24px; border-radius: 10px; margin-bottom: 16px;
-        box-shadow: 0 4px 16px rgba(16,185,129,0.15);
+    /* Banner de sinal (plano, sem gradiente) */
+    .alert-banner-buy, .alert-banner-sell, .alert-banner-neutral {
+        border-radius: 8px; padding: 18px; margin-bottom: 14px; border: 1px solid #1f2430;
     }
-    .alert-banner-sell {
-        background: linear-gradient(135deg, #3b0f0f, #4c1d1d);
-        border: 1px solid #ef4444;
-        color: #fecaca; padding: 24px; border-radius: 10px; margin-bottom: 16px;
-        box-shadow: 0 4px 16px rgba(239,68,68,0.15);
-    }
-    .alert-banner-neutral {
-        background: linear-gradient(135deg, #1f2937, #111827);
-        border: 1px solid #4b5563;
-        color: #cbd5e1; padding: 24px; border-radius: 10px; margin-bottom: 16px;
-    }
-    .alert-banner-title { font-size: 12px; font-weight: 600; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px; }
-    .alert-banner-signal { font-size: 36px; font-weight: 800; margin: 8px 0; letter-spacing: -1px; }
-    .alert-banner-info { font-size: 14px; opacity: 0.95; line-height: 1.6; }
+    .alert-banner-buy { background: #14241b; border-color: #16a34a; color: #d1fae5; }
+    .alert-banner-sell { background: #2a1718; border-color: #dc2626; color: #fecaca; }
+    .alert-banner-neutral { background: #1a1f29; border-color: #4b5563; color: #cbd5e1; }
+    .alert-banner-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .alert-banner-signal { font-size: 28px; font-weight: 700; margin: 6px 0; }
+    .alert-banner-info { font-size: 13px; line-height: 1.6; }
 
     /* Pills */
-    .pill-buy    { background: rgba(16,185,129,0.15); color: #10b981; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 12px; border: 1px solid rgba(16,185,129,0.3); }
-    .pill-sell   { background: rgba(239,68,68,0.15); color: #ef4444; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 12px; border: 1px solid rgba(239,68,68,0.3); }
-    .pill-neutral{ background: rgba(245,158,11,0.15); color: #f59e0b; padding: 4px 12px; border-radius: 12px; font-weight: 700; font-size: 12px; border: 1px solid rgba(245,158,11,0.3); }
+    .pill-buy { background: rgba(22,163,74,.15); color: #16a34a; padding: 3px 10px; border-radius: 6px; font-weight: 600; font-size: 12px; }
+    .pill-sell { background: rgba(220,38,38,.15); color: #dc2626; padding: 3px 10px; border-radius: 6px; font-weight: 600; font-size: 12px; }
+    .pill-neutral { background: rgba(148,163,184,.15); color: #94a3b8; padding: 3px 10px; border-radius: 6px; font-weight: 600; font-size: 12px; }
 
-    /* Indicadores técnicos */
-    .indicator-card {
-        background: #161a23; border: 1px solid #1f2430; border-radius: 10px;
-        padding: 16px; height: 100%;
-    }
-    .indicator-name { font-size: 11px; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-    .indicator-value { font-size: 24px; font-weight: 800; color: #f1f5f9; margin: 6px 0; }
+    /* Indicadores tecnicos */
+    .indicator-name { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
+    .indicator-value { font-size: 20px; font-weight: 700; color: #f1f5f9; margin: 6px 0; }
     .indicator-desc { font-size: 11px; color: #94a3b8; }
 
-    /* News cards */
-    .news-card {
-        background: #161a23; border: 1px solid #1f2430; border-radius: 10px;
-        padding: 18px; margin-bottom: 10px;
-    }
-    .news-tag {
-        display: inline-block; padding: 2px 8px; border-radius: 4px;
-        font-size: 10px; font-weight: 700; letter-spacing: 0.5px; margin-right: 6px;
-    }
-    .news-tag-macro { background: rgba(59,130,246,0.18); color: #60a5fa; }
-    .news-tag-bancos { background: rgba(16,185,129,0.18); color: #10b981; }
-    .news-tag-analise { background: rgba(168,85,247,0.18); color: #c084fc; }
-    .news-tag-mercado { background: rgba(245,158,11,0.18); color: #fbbf24; }
-    .news-tag-regulatorio { background: rgba(236,72,153,0.18); color: #f472b6; }
-    .news-tag-cambio { background: rgba(20,184,166,0.18); color: #2dd4bf; }
-    .news-tag-hot { background: rgba(239,68,68,0.18); color: #f87171; }
-    .news-title { font-size: 14px; font-weight: 700; color: #f1f5f9; margin: 8px 0 6px 0; }
+    /* Noticias (placeholder) */
+    .news-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-right: 6px; background: #1f2430; color: #94a3b8; }
+    .news-title { font-size: 14px; font-weight: 600; color: #f1f5f9; margin: 8px 0 6px 0; }
     .news-resumo { font-size: 12px; color: #94a3b8; line-height: 1.5; }
     .news-meta { font-size: 11px; color: #64748b; margin-top: 8px; }
 
-    /* Sinais de hoje (lista lateral) */
-    .signal-row {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 10px 0; border-bottom: 1px solid #1f2430;
-    }
-    .signal-row:last-child { border-bottom: none; }
-    .signal-ticker { font-size: 13px; font-weight: 700; color: #f1f5f9; }
-    .signal-price { font-size: 12px; color: #94a3b8; margin-left: 8px; }
+    /* Linhas de sinais */
+    .signal-row { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #1f2430; }
+    .signal-row:last-child { border-bottom:none; }
+    .signal-ticker { font-size:13px; font-weight:600; color:#f1f5f9; }
+    .signal-price { font-size:12px; color:#94a3b8; margin-left:8px; }
 
-    /* Card EconomIA */
-    .economia-card {
-        background: linear-gradient(135deg, #2d1a4a 0%, #1a1530 100%);
-        border: 1px solid #6b21a8;
-        border-radius: 10px; padding: 20px; margin-top: 12px;
-    }
-    .economia-badge {
-        display: inline-block; background: rgba(168,85,247,0.25); color: #c084fc;
-        padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700;
-        letter-spacing: 1px;
-    }
-    .economia-title { font-size: 16px; font-weight: 700; color: #f1f5f9; margin: 8px 0; }
-    .economia-desc { font-size: 12px; color: #cbd5e1; line-height: 1.5; }
-    .economia-button {
-        background: #a855f7; color: white; padding: 10px; border-radius: 8px;
-        text-align: center; font-weight: 700; font-size: 13px; margin-top: 12px;
-        cursor: pointer;
-    }
+    /* Card / badge de desenvolvimento */
+    .economia-badge { display:inline-block; background:#1f2430; color:#94a3b8; padding:2px 8px; border-radius:4px; font-size:10px; font-weight:700; letter-spacing:1px; }
+    .economia-title { font-size:16px; font-weight:700; color:#f1f5f9; margin:8px 0; }
+    .economia-desc { font-size:12px; color:#cbd5e1; line-height:1.5; }
+    .economia-button { background:#1f2430; color:#f1f5f9; padding:10px; border-radius:6px; text-align:center; font-weight:600; font-size:13px; margin-top:12px; }
 
-    /* Aviso amarelo */
-    .alert-warning {
-        background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);
-        color: #fbbf24; padding: 12px; border-radius: 8px; font-size: 12px;
-        margin-top: 12px;
-    }
+    .alert-warning { background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.25); color:#cbd5e1; padding:12px; border-radius:6px; font-size:12px; margin-top:12px; }
 
-    /* Esconde o label "Navegação" duplicado */
+    .sidebar-section-title { font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin:14px 0 6px 0; }
+
     div[data-testid="stRadio"] > label { display: none; }
 
-    /* Sidebar - títulos das seções */
-    .sidebar-section-title {
-        font-size: 10px; color: #64748b; font-weight: 700;
-        text-transform: uppercase; letter-spacing: 1px;
-        margin: 16px 0 8px 0; padding-left: 4px;
-    }
+    [data-testid="stMetric"] { background:#161a23; border:1px solid #1f2430; border-radius:8px; padding:12px; }
+    [data-testid="stMetricLabel"] { color:#94a3b8 !important; }
+    [data-testid="stMetricValue"] { color:#f1f5f9 !important; }
 
-    /* Streamlit components dark adjustments */
-    [data-testid="stMetric"] {
-        background: #161a23; border: 1px solid #1f2430;
-        border-radius: 10px; padding: 14px;
-    }
-    [data-testid="stMetricLabel"] { color: #94a3b8 !important; font-size: 11px !important; }
-    [data-testid="stMetricValue"] { color: #f1f5f9 !important; }
+    .stButton > button { background:#1f2430; color:#f1f5f9; border:1px solid #2a2f3a; border-radius:6px; }
+    .stButton > button:hover { background:#2a2f3a; border-color:#64748b; }
 
-    /* Botões */
-    .stButton > button {
-        background: #1f2430; color: #f1f5f9;
-        border: 1px solid #2a2f3a; border-radius: 8px;
-    }
-    .stButton > button:hover {
-        background: #2a2f3a; border-color: #a855f7;
-    }
-
-    /* Tabelas */
-    [data-testid="stDataFrame"] { background: #161a23; border-radius: 10px; }
+    [data-testid="stDataFrame"] { background:#161a23; border-radius:8px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -737,15 +640,15 @@ def banner_alerta(sinal: str, ticker: str, preco_atual: float, preco_previsto: f
 
     if sinal == "compra":
         classe = "alert-banner-buy"
-        emoji = "🟢"
+        emoji = ""
         titulo = "SINAL DE COMPRA DETECTADO"
     elif sinal == "venda":
         classe = "alert-banner-sell"
-        emoji = "🔴"
+        emoji = ""
         titulo = "SINAL DE VENDA DETECTADO"
     else:
         classe = "alert-banner-neutral"
-        emoji = "⚪"
+        emoji = ""
         titulo = "TENDÊNCIA NEUTRA"
 
     st.markdown(f"""
@@ -859,11 +762,11 @@ def tela_inicio(df: pd.DataFrame) -> None:
     col_noticias, col_lateral = st.columns([2.3, 1])
 
     with col_noticias:
-        st.markdown("### 📰 Últimas Notícias")
+        st.markdown("### Últimas Notícias")
         st.markdown("""
-        <div style="background:linear-gradient(135deg, #2d1a4a 0%, #1a1530 100%);
-                    border:1px solid #6b21a8; border-radius:12px; padding:32px; text-align:center;">
-            <span class="economia-badge">🚧 EM DESENVOLVIMENTO · TC II</span>
+        <div style="background:#161a23;
+                    border:1px solid #1f2430; border-radius:12px; padding:32px; text-align:center;">
+            <span class="economia-badge">EM DESENVOLVIMENTO · TC II</span>
             <h3 style="color:#f1f5f9; margin-top:12px; font-size:20px;">Feed de notícias em construção</h3>
             <p style="color:#cbd5e1; line-height:1.6; margin-top:8px; font-size:13px;">
                 A integração com APIs de notícias do mercado financeiro está prevista
@@ -879,16 +782,16 @@ def tela_inicio(df: pd.DataFrame) -> None:
         <div class="custom-card">
             <div style="font-size:11px; color:#64748b; font-weight:700; letter-spacing:1px;">ACESSO RÁPIDO</div>
             <div style="margin-top:12px;">
-                <div style="background:linear-gradient(90deg, rgba(16,185,129,0.1), transparent); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:12px; margin-bottom:8px;">
-                    <div style="font-size:13px; font-weight:700; color:#10b981;">👁️ Painel Iniciante</div>
+                <div style="background:#161a23; border:1px solid #1f2430; border-radius:8px; padding:12px; margin-bottom:8px;">
+                    <div style="font-size:13px; font-weight:700; color:#10b981;">Painel Iniciante</div>
                     <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Simples e visual</div>
                 </div>
-                <div style="background:linear-gradient(90deg, rgba(59,130,246,0.1), transparent); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:12px; margin-bottom:8px;">
-                    <div style="font-size:13px; font-weight:700; color:#60a5fa;">📊 Painel Avançado</div>
+                <div style="background:#161a23; border:1px solid #1f2430; border-radius:8px; padding:12px; margin-bottom:8px;">
+                    <div style="font-size:13px; font-weight:700; color:#60a5fa;">Painel Avançado</div>
                     <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Técnico e preditivo</div>
                 </div>
-                <div style="background:linear-gradient(90deg, rgba(168,85,247,0.1), transparent); border:1px solid rgba(168,85,247,0.3); border-radius:8px; padding:12px;">
-                    <div style="font-size:13px; font-weight:700; color:#c084fc;">🤖 EconomIA</div>
+                <div style="background:#161a23; border:1px solid #1f2430; border-radius:8px; padding:12px;">
+                    <div style="font-size:13px; font-weight:700; color:#c084fc;">EconomIA</div>
                     <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Pergunte à IA</div>
                 </div>
             </div>
@@ -937,7 +840,7 @@ def tela_inicio(df: pd.DataFrame) -> None:
         # Card EconomIA promocional
         st.markdown("""
         <div class="economia-card">
-            <span class="economia-badge">🤖 IA · TC II</span>
+            <span class="economia-badge">IA · TC II</span>
             <div class="economia-title">EconomIA</div>
             <div class="economia-desc">
                 Pergunte sobre qualquer ação do setor bancário, indicadores técnicos ou conjuntura econômica.
@@ -951,7 +854,7 @@ def tela_inicio(df: pd.DataFrame) -> None:
     st.markdown("""
     <div style="background:rgba(245,158,11,0.08); border-left:3px solid #f59e0b;
                 padding:12px 16px; border-radius:6px; margin-top:12px;">
-        <strong style="color:#fbbf24;">⚠️ Aviso importante:</strong>
+        <strong style="color:#fbbf24;">Aviso importante:</strong>
         <span style="color:#cbd5e1; font-size:13px;">
             Esta plataforma é educacional. Não constitui recomendação de investimento. Consulte um assessor credenciado pela CVM antes de tomar decisões financeiras.
         </span>
@@ -961,7 +864,7 @@ def tela_inicio(df: pd.DataFrame) -> None:
 
 def tela_economia() -> None:
     """Placeholder da IA conversacional — entrega prevista para o TC II."""
-    st.markdown('<div class="page-title">🤖 EconomIA — Assistente Conversacional</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">EconomIA — Assistente Conversacional</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="page-subtitle">Funcionalidade prevista para o TC II — entrega final do TCC</div>',
         unsafe_allow_html=True,
@@ -969,9 +872,9 @@ def tela_economia() -> None:
 
     # Banner explicativo
     st.markdown("""
-    <div style="background:linear-gradient(135deg, #2d1a4a 0%, #1a1530 100%);
-                border:1px solid #6b21a8; border-radius:12px; padding:32px; margin-bottom:24px;">
-        <span class="economia-badge">🚧 EM DESENVOLVIMENTO · TC II</span>
+    <div style="background:#161a23;
+                border:1px solid #1f2430; border-radius:12px; padding:32px; margin-bottom:24px;">
+        <span class="economia-badge">EM DESENVOLVIMENTO · TC II</span>
         <h2 style="color:#f1f5f9; margin-top:12px; font-size:24px;">
             Pergunte à IA sobre o mercado
         </h2>
@@ -985,18 +888,18 @@ def tela_economia() -> None:
     """, unsafe_allow_html=True)
 
     # Prévia: exemplos de perguntas que serão suportadas
-    st.markdown("### 💬 Exemplos de perguntas que a EconomIA responderá")
+    st.markdown("### Exemplos de perguntas que a EconomIA responderá")
 
     col_a, col_b = st.columns(2)
 
     exemplos_iniciante = [
-        ("👤 Pergunta", "Por que o sistema sugeriu compra para ITUB4 hoje?"),
-        ("🤖 EconomIA", "O sistema identificou três indicadores apontando para uma possível tendência de alta no ITUB4. O MACD cruzou a linha de sinal para cima há dois dias, padrão historicamente associado a movimentos altistas. O preço atual está no terço superior das Bandas de Bollinger, indicando força do movimento. E o RSI em 58 mostra que ainda há espaço para subida. Lembre-se: isto é apoio à decisão, não recomendação."),
+        ("Pergunta", "Por que o sistema sugeriu compra para ITUB4 hoje?"),
+        ("EconomIA", "O sistema identificou três indicadores apontando para uma possível tendência de alta no ITUB4. O MACD cruzou a linha de sinal para cima há dois dias, padrão historicamente associado a movimentos altistas. O preço atual está no terço superior das Bandas de Bollinger, indicando força do movimento. E o RSI em 58 mostra que ainda há espaço para subida. Lembre-se: isto é apoio à decisão, não recomendação."),
     ]
 
     exemplos_expert = [
-        ("👤 Pergunta", "Qual feature mais pesou no sinal de compra de hoje?"),
-        ("🤖 EconomIA", "Na execução de hoje, a feature de maior contribuição foi o macd_hist_z (z-score do histograma do MACD), com 16,61% de importância no Random Forest. As três features de maior peso foram: macd_hist_z (16,61%), sma_9_ratio (12,76%) e rsi_14 (12,56%). Em conjunto representam mais de 41% das decisões do modelo nas últimas 24 horas."),
+        ("Pergunta", "Qual feature mais pesou no sinal de compra de hoje?"),
+        ("EconomIA", "Na execução de hoje, a feature de maior contribuição foi o macd_hist_z (z-score do histograma do MACD), com 16,61% de importância no Random Forest. As três features de maior peso foram: macd_hist_z (16,61%), sma_9_ratio (12,76%) e rsi_14 (12,56%). Em conjunto representam mais de 41% das decisões do modelo nas últimas 24 horas."),
     ]
 
     with col_a:
@@ -1030,12 +933,12 @@ def tela_economia() -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Arquitetura técnica
-    st.markdown("### 🏗️ Como funcionará")
+    st.markdown("### Como funcionará")
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("""
         <div class="custom-card">
-            <div style="font-size:24px;">1️⃣</div>
+            <div style="font-size:24px;">1</div>
             <div style="font-weight:700; color:#f1f5f9; margin-top:6px;">Usuário faz a pergunta</div>
             <div style="color:#94a3b8; font-size:12px; margin-top:4px;">Em linguagem natural, sobre qualquer um dos 4 ativos monitorados.</div>
         </div>
@@ -1043,7 +946,7 @@ def tela_economia() -> None:
     with col2:
         st.markdown("""
         <div class="custom-card">
-            <div style="font-size:24px;">2️⃣</div>
+            <div style="font-size:24px;">2</div>
             <div style="font-weight:700; color:#f1f5f9; margin-top:6px;">Sistema busca contexto</div>
             <div style="color:#94a3b8; font-size:12px; margin-top:4px;">Recupera dados atuais dos Parquet/JSON: preço, indicadores, sinal gerado.</div>
         </div>
@@ -1051,14 +954,14 @@ def tela_economia() -> None:
     with col3:
         st.markdown("""
         <div class="custom-card">
-            <div style="font-size:24px;">3️⃣</div>
+            <div style="font-size:24px;">3</div>
             <div style="font-weight:700; color:#f1f5f9; margin-top:6px;">Claude responde</div>
             <div style="color:#94a3b8; font-size:12px; margin-top:4px;">Combina o contexto recuperado com seu conhecimento de finanças (técnica RAG).</div>
         </div>
         """, unsafe_allow_html=True)
 
     # Salvaguardas
-    st.markdown("### 🛡️ Salvaguardas éticas e regulatórias")
+    st.markdown("### Salvaguardas éticas e regulatórias")
     st.markdown("""
     <div class="custom-card">
         <ul style="color:#cbd5e1; line-height:1.8; margin:0;">
@@ -1073,226 +976,31 @@ def tela_economia() -> None:
 
     # Status
     st.info(
-        "📌 **Status atual:** funcionalidade documentada na seção 3.9 do TCC, "
+        "**Status atual:** funcionalidade documentada na seção 3.9 do TCC, "
         "com referências teóricas a Brown et al. (2020), Lewis et al. (2020) e Vaswani et al. (2017). "
         "Implementação técnica prevista para a entrega final (TC II)."
     )
 
 
 def tela_previsoes_macro() -> None:
-    """Dashboard de previsões macroeconômicas: Selic, Fed, IPCA, Yields, Polymarket."""
-    from datetime import datetime, timedelta
-
-    st.markdown('<div class="page-title">📈 Previsões & Macroeconomia</div>', unsafe_allow_html=True)
+    """Previsoes & Macro - entrega prevista para o TC II."""
+    st.markdown('<div class="page-title">Previsoes e Macroeconomia</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="page-subtitle">Indicadores macro e sentimento de mercado relevantes para o setor bancário</div>',
+        '<div class="page-subtitle">Indicadores macro e sentimento de mercado - entrega prevista para o TC II</div>',
         unsafe_allow_html=True,
     )
-
     st.info(
-        "🔌 **Integração via APIs prevista para o TC II** — os valores abaixo são "
-        "ilustrativos baseados em dados públicos recentes (jun/2026). No TC II "
-        "serão atualizados em tempo real via APIs do Banco Central, FRED (Reserva "
-        "Federal dos EUA) e Polymarket."
+        "Funcionalidade em desenvolvimento. A integracao automatica de indicadores "
+        "macroeconomicos (Selic, IPCA, Fed Funds, Treasury Yields) e do mercado de "
+        "previsao Polymarket esta prevista para a entrega final do TCC (TC II). "
+        "Estes dados sao apenas contextuais e nao influenciam os sinais de compra e "
+        "venda, que sao gerados pelo modelo Random Forest a partir dos indicadores tecnicos."
     )
-
-    # ── PRÓXIMA DECISÃO COPOM (Polymarket) ────────────────────────────
-    st.markdown("### 🏛️ Próxima decisão Copom — Sentimento de mercado")
-    st.caption("Polymarket • Bank of Brazil Decision in June 2026 • ~$56k em volume negociado")
-
-    col_a, col_b, col_c = st.columns(3)
-
-    cenarios_copom = [
-        ("Queda", 68, "#10b981", "▼", "Mercado aposta em corte de 25 bps"),
-        ("Manutenção", 33, "#f59e0b", "●", "Possibilidade de pausa no ciclo"),
-        ("Alta", 2, "#ef4444", "▲", "Cenário improvável"),
-    ]
-
-    for col, (cenario, prob, cor, arrow, desc) in zip([col_a, col_b, col_c], cenarios_copom):
-        with col:
-            st.markdown(f"""
-            <div class="custom-card" style="border-left:3px solid {cor};">
-                <div style="font-size:11px; color:#94a3b8; font-weight:700; letter-spacing:1px;">{cenario.upper()}</div>
-                <div style="font-size:32px; font-weight:800; color:{cor}; margin:6px 0;">{prob}%</div>
-                <div style="font-size:11px; color:#cbd5e1;">{arrow} {desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # ── TAXAS DE JUROS E INFLAÇÃO ─────────────────────────────────────
-    st.markdown("### 💰 Taxas de juros e inflação")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    metricas_macro = [
-        ("SELIC", "14,75", "% a.a.", "Banco Central do Brasil", "#3b82f6"),
-        ("IPCA", "5,32", "% (12m)", "IBGE • acima da meta", "#f59e0b"),
-        ("FED FUNDS", "4,25 – 4,50", "% a.a.", "Reserva Federal (EUA)", "#10b981"),
-        ("USD/BRL", "R$ 5,14", "", "Câmbio comercial", "#a855f7"),
-    ]
-
-    for col, (label, valor, unit, desc, cor) in zip([col1, col2, col3, col4], metricas_macro):
-        with col:
-            st.markdown(f"""
-            <div class="custom-card">
-                <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:1px;">{label}</div>
-                <div style="font-size:24px; font-weight:800; color:#f1f5f9; margin:4px 0;">
-                    {valor} <span style="font-size:12px; color:#94a3b8; font-weight:500;">{unit}</span>
-                </div>
-                <div style="font-size:11px; color:{cor};">{desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # ── YIELDS AMERICANOS ─────────────────────────────────────────────
-    st.markdown("### 🇺🇸 Treasury Yields — Curva de juros americana")
-    st.caption("Rendimentos dos títulos do Tesouro Americano em diferentes prazos")
-
-    yields_data = [
-        ("2-Year", 4.18, "Curto prazo"),
-        ("5-Year", 4.35, "Médio prazo"),
-        ("10-Year", 4.42, "Referência global"),
-        ("30-Year", 4.61, "Longo prazo"),
-    ]
-
-    col_yields = st.columns(4)
-    for col, (prazo, valor, desc) in zip(col_yields, yields_data):
-        with col:
-            st.markdown(f"""
-            <div class="custom-card">
-                <div style="font-size:10px; color:#64748b; font-weight:700; letter-spacing:1px;">US TREASURY {prazo.upper()}</div>
-                <div style="font-size:22px; font-weight:800; color:#f1f5f9; margin:4px 0;">{valor:.2f}%</div>
-                <div style="font-size:11px; color:#94a3b8;">{desc}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-    # ── GRÁFICO DA CURVA DE JUROS ─────────────────────────────────────
-    import plotly.graph_objects as go
-    fig_curva = go.Figure()
-    fig_curva.add_trace(go.Scatter(
-        x=["3M", "6M", "1Y", "2Y", "5Y", "10Y", "30Y"],
-        y=[4.32, 4.28, 4.22, 4.18, 4.35, 4.42, 4.61],
-        mode="lines+markers",
-        name="Curva atual",
-        line=dict(color="#10b981", width=3),
-        marker=dict(size=10),
-    ))
-    fig_curva.add_trace(go.Scatter(
-        x=["3M", "6M", "1Y", "2Y", "5Y", "10Y", "30Y"],
-        y=[5.30, 5.18, 4.85, 4.65, 4.48, 4.50, 4.68],
-        mode="lines+markers",
-        name="Há 6 meses",
-        line=dict(color="#64748b", width=2, dash="dash"),
-        marker=dict(size=8),
-    ))
-    fig_curva.update_layout(
-        title=dict(text="Curva de juros americana (Treasury Yields)", font=dict(size=14, color="#f1f5f9")),
-        xaxis_title="Prazo", yaxis_title="Rendimento (% a.a.)",
-        height=320,
-        paper_bgcolor="#0b0f14", plot_bgcolor="#0b0f14",
-        font=dict(color="#cbd5e1"),
-        xaxis=dict(gridcolor="#1f2430", color="#94a3b8"),
-        yaxis=dict(gridcolor="#1f2430", color="#94a3b8"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
-        margin=dict(l=40, r=20, t=60, b=40),
-    )
-    st.plotly_chart(fig_curva, use_container_width=True)
-
-    st.markdown("---")
-
-    # ── HISTÓRICO SELIC vs IPCA ───────────────────────────────────────
-    st.markdown("### 📉 Histórico — Selic vs IPCA (Brasil)")
-
-    datas_hist = pd.date_range(end=datetime.now(), periods=24, freq="ME")
-    selic_hist = [10.50, 10.75, 11.25, 11.75, 12.25, 12.75, 13.25, 13.75,
-                  13.75, 13.75, 13.75, 13.50, 13.25, 13.00, 12.75, 12.50,
-                  12.25, 12.00, 11.75, 11.50, 11.25, 11.00, 10.75, 14.75]
-    ipca_hist = [4.5, 4.7, 4.8, 5.1, 5.4, 5.6, 5.8, 5.7, 5.5, 5.3, 5.1,
-                 4.9, 4.7, 4.6, 4.4, 4.3, 4.5, 4.7, 4.9, 5.0, 5.1, 5.2, 5.3, 5.32]
-
-    fig_sel = go.Figure()
-    fig_sel.add_trace(go.Scatter(
-        x=datas_hist, y=selic_hist, name="Selic", mode="lines",
-        line=dict(color="#3b82f6", width=3),
-    ))
-    fig_sel.add_trace(go.Scatter(
-        x=datas_hist, y=ipca_hist, name="IPCA (12m)", mode="lines",
-        line=dict(color="#f59e0b", width=3),
-    ))
-    fig_sel.add_hline(y=3.0, line_dash="dot", line_color="#10b981",
-                     annotation_text="Meta IPCA: 3,0%", annotation_position="bottom right")
-    fig_sel.update_layout(
-        title=dict(text="Selic vs IPCA (% a.a.) — últimos 24 meses", font=dict(size=14, color="#f1f5f9")),
-        xaxis_title="", yaxis_title="% ao ano",
-        height=340,
-        paper_bgcolor="#0b0f14", plot_bgcolor="#0b0f14",
-        font=dict(color="#cbd5e1"),
-        xaxis=dict(gridcolor="#1f2430", color="#94a3b8"),
-        yaxis=dict(gridcolor="#1f2430", color="#94a3b8"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
-        margin=dict(l=40, r=20, t=60, b=40),
-    )
-    st.plotly_chart(fig_sel, use_container_width=True)
-
-    # ── EXPLICAÇÃO PEDAGÓGICA ─────────────────────────────────────────
-    st.markdown("### 💡 Por que esses indicadores importam para bancos?")
-
-    col_e1, col_e2 = st.columns(2)
-
-    with col_e1:
-        st.markdown("""
-        <div class="custom-card">
-            <div style="font-weight:700; color:#f1f5f9; margin-bottom:8px;">🇧🇷 Selic alta</div>
-            <div style="color:#cbd5e1; font-size:13px; line-height:1.6;">
-                Quando a Selic sobe, bancos brasileiros tendem a se beneficiar:
-                a margem financeira líquida aumenta e o spread bancário se amplia.
-                Mas a inadimplência também tende a crescer, exigindo mais provisões (PDD).
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
-        <div class="custom-card">
-            <div style="font-weight:700; color:#f1f5f9; margin-bottom:8px;">📊 IPCA controlado</div>
-            <div style="color:#cbd5e1; font-size:13px; line-height:1.6;">
-                Inflação dentro da meta (3% ± 1,5%) permite que o Banco Central
-                reduza a Selic, estimulando o crédito e melhorando a qualidade da
-                carteira. IPCA fora da meta pressiona Copom a manter juros altos.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col_e2:
-        st.markdown("""
-        <div class="custom-card">
-            <div style="font-weight:700; color:#f1f5f9; margin-bottom:8px;">🇺🇸 Treasury Yields</div>
-            <div style="color:#cbd5e1; font-size:13px; line-height:1.6;">
-                O rendimento dos títulos americanos é referência global. Quando os
-                yields americanos sobem, capital migra para os EUA, pressionando o
-                câmbio brasileiro e impactando o resultado dos bancos com operações
-                em moeda estrangeira.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("""
-        <div class="custom-card">
-            <div style="font-weight:700; color:#f1f5f9; margin-bottom:8px;">🎯 Polymarket</div>
-            <div style="color:#cbd5e1; font-size:13px; line-height:1.6;">
-                As probabilidades agregadas refletem o consenso de traders globais
-                sobre a próxima decisão do Copom. Estudos mostram que prediction
-                markets frequentemente superam previsões de especialistas
-                (Wolfers & Zitzewitz, 2004).
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
 
 def tela_economia_funcional(df: pd.DataFrame, modelos: dict, metricas: Optional[dict]) -> None:
     """EconomIA funcional — responde perguntas básicas com dados reais do sistema."""
-    st.markdown('<div class="page-title">🤖 EconomIA — Assistente</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">EconomIA — Assistente</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="page-subtitle">Demo • Responde perguntas sobre os 4 ativos monitorados • '
         'Versão completa com Claude API prevista para o TC II</div>',
@@ -1301,7 +1009,7 @@ def tela_economia_funcional(df: pd.DataFrame, modelos: dict, metricas: Optional[
 
     # Aviso sobre o estado atual
     st.warning(
-        "🚧 **Versão demonstrativa em desenvolvimento.** Esta primeira versão responde a um "
+        "**Versão demonstrativa em desenvolvimento.** Esta primeira versão responde a um "
         "conjunto limitado de perguntas usando dados reais do sistema. A integração completa "
         "com Claude API (Anthropic) está prevista para o TC II, permitindo perguntas em "
         "linguagem natural sobre qualquer aspecto dos ativos monitorados."
@@ -1312,7 +1020,7 @@ def tela_economia_funcional(df: pd.DataFrame, modelos: dict, metricas: Optional[
         st.session_state.chat_historico = []
 
     # Sugestões de perguntas
-    st.markdown("### 💡 Perguntas que a EconomIA já responde")
+    st.markdown("### Perguntas que a EconomIA já responde")
     st.caption("Clique em qualquer uma para obter a resposta:")
 
     perguntas_suportadas = [
@@ -1336,7 +1044,7 @@ def tela_economia_funcional(df: pd.DataFrame, modelos: dict, metricas: Optional[
 
     # Campo de pergunta livre
     st.markdown("---")
-    st.markdown("### ✍️ Faça sua pergunta")
+    st.markdown("### Faça sua pergunta")
     pergunta_livre = st.text_input(
         "Digite sua pergunta:",
         placeholder="Ex: Como funciona o MACD?",
@@ -1350,21 +1058,21 @@ def tela_economia_funcional(df: pd.DataFrame, modelos: dict, metricas: Optional[
     # Exibe histórico
     if st.session_state.chat_historico:
         st.markdown("---")
-        st.markdown("### 💬 Conversa")
+        st.markdown("### Conversa")
         # Inverte para mostrar mais recente em cima
         for item in reversed(st.session_state.chat_historico[-10:]):
             st.markdown(f"""
             <div style="background:#1f2430; border-left:3px solid #94a3b8; padding:12px 16px; border-radius:8px; margin-bottom:8px;">
-                <div style="font-size:11px; color:#94a3b8; font-weight:700; margin-bottom:4px;">👤 VOCÊ</div>
+                <div style="font-size:11px; color:#94a3b8; font-weight:700; margin-bottom:4px;">VOCÊ</div>
                 <div style="color:#f1f5f9; font-size:13px;">{item['pergunta']}</div>
             </div>
-            <div style="background:linear-gradient(135deg,#2d1a4a,#1a1530); border-left:3px solid #a855f7; padding:14px 16px; border-radius:8px; margin-bottom:16px;">
-                <div style="font-size:11px; color:#c084fc; font-weight:700; margin-bottom:6px;">🤖 ECONOMIA</div>
+            <div style="background:#161a23; border-left:3px solid #1f2430; padding:14px 16px; border-radius:8px; margin-bottom:16px;">
+                <div style="font-size:11px; color:#c084fc; font-weight:700; margin-bottom:6px;">ECONOMIA</div>
                 <div style="color:#e5e7eb; font-size:13px; line-height:1.6;">{item['resposta']}</div>
             </div>
             """, unsafe_allow_html=True)
 
-        if st.button("🗑️ Limpar conversa"):
+        if st.button("Limpar conversa"):
             st.session_state.chat_historico = []
             st.rerun()
 
@@ -1484,7 +1192,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
                    f"({metricas['info_treinamento']['data_treinamento'][:10]}): "
                    f"<b>F1-Score de {f1_oos:.4f}</b> e <b>acurácia de {acc_oos:.4f}</b> "
                    "no conjunto out-of-sample (SANB11, nunca visto pelo modelo). "
-                   "<br><br>⚠️ <b>Importante:</b> esse F1 ainda está próximo de uma escolha "
+                   "<br><br><b>Importante:</b> esse F1 ainda está próximo de uma escolha "
                    "aleatória (0,33 para 3 classes). É o resultado esperado nesta fase do "
                    "TC I — estão previstos ajustes substanciais para o TC II: GridSearchCV, "
                    "novas features (volume, volatilidade), comparação com SVM e LSTM.")
@@ -1509,7 +1217,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
         if not sub.empty:
             sinal, conf = obter_sinal(sub.iloc[-1])
             preco = sub.iloc[-1]["close"]
-            return (f"⚠️ <b>Importante:</b> o sistema não emite recomendações de compra ou venda. "
+            return (f"<b>Importante:</b> o sistema não emite recomendações de compra ou venda. "
                    f"Posso te dizer apenas o que os indicadores estão mostrando agora: "
                    f"<br><br>Para <b>{ticker}</b> ({TICKERS_INFO[ticker]['nome']}), o sinal "
                    f"atual do modelo é <b>{sinal.upper()}</b> com {conf:.0f}% de confiança, "
@@ -1524,13 +1232,13 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
         if not sub.empty:
             sinal, conf = obter_sinal(sub.iloc[-1])
             preco = sub.iloc[-1]["close"]
-            return (f"📊 Sobre <b>{ticker}</b> ({TICKERS_INFO[ticker]['nome']}): preço atual "
+            return (f"Sobre <b>{ticker}</b> ({TICKERS_INFO[ticker]['nome']}): preço atual "
                    f"R$ {preco:.2f}, sinal do modelo <b>{sinal.upper()}</b> "
                    f"({conf:.0f}% confiança). Para análise detalhada, vá no <b>Painel "
                    "Avançado</b> e selecione essa ação.")
 
     # ── FALLBACK ──────────────────────────────────────────────────
-    return ("🤔 Ainda não fui treinada para responder essa pergunta específica. "
+    return ("Ainda não fui treinada para responder essa pergunta específica. "
             "A versão completa (TC II), integrada ao Claude (Anthropic), conseguirá "
             "responder perguntas em linguagem natural sobre qualquer aspecto do sistema. "
             "<br><br>Por enquanto, experimente uma das <b>perguntas sugeridas acima</b> ou "
@@ -1541,7 +1249,7 @@ def responder_pergunta(pergunta: str, df: pd.DataFrame, modelos: dict, metricas:
 
 def tela_visao_geral(df: pd.DataFrame, modo: str) -> None:
     """Tela de visão geral simplificada (referência legada)."""
-    st.markdown('<div class="page-title">🏠 Visão Geral do Setor Financeiro — B3</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Visão Geral do Setor Financeiro — B3</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="page-subtitle">Panorama atual das quatro principais ações de bancos brasileiros</div>',
         unsafe_allow_html=True,
@@ -1556,13 +1264,13 @@ def tela_visao_geral(df: pd.DataFrame, modo: str) -> None:
             sinal, _ = obter_sinal(sub.iloc[0])
             sinais_resumo[sinal] += 1
 
-    col1.metric("🟢 Sugestões de compra hoje", sinais_resumo["compra"])
-    col2.metric("🔴 Sugestões de cautela hoje", sinais_resumo["venda"])
-    col3.metric("⚪ Sem sinal claro", sinais_resumo["neutro"])
-    col4.metric("📊 Ações acompanhadas", len(TICKERS_INFO))
+    col1.metric("Sugestões de compra hoje", sinais_resumo["compra"])
+    col2.metric("Sugestões de cautela hoje", sinais_resumo["venda"])
+    col3.metric("Sem sinal claro", sinais_resumo["neutro"])
+    col4.metric("Ações acompanhadas", len(TICKERS_INFO))
 
     st.markdown("---")
-    st.markdown("### 📈 Ações que o sistema acompanha")
+    st.markdown("### Ações que o sistema acompanha")
     colunas = st.columns(4)
     for i, (ticker, info) in enumerate(TICKERS_INFO.items()):
         sub = df[df["ticker"] == ticker].copy()
@@ -1572,7 +1280,7 @@ def tela_visao_geral(df: pd.DataFrame, modo: str) -> None:
         anterior = sub.iloc[-2] if len(sub) > 1 else ultimo
         variacao = (ultimo["close"] - anterior["close"]) / anterior["close"] * 100
         sinal, conf = obter_sinal(ultimo)
-        cor_sinal = "🟢" if sinal == "compra" else "🔴" if sinal == "venda" else "⚪"
+        cor_sinal = "" if sinal == "compra" else "" if sinal == "venda" else ""
         descricao = {"compra": "Momento favorável",
                      "venda": "Sinal de cautela",
                      "neutro": "Sem direção clara"}[sinal]
@@ -1619,7 +1327,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     if sinal == "compra":
         resposta_curta = "Pode ser um bom momento"
         cor_classe = "alert-banner-buy"
-        emoji = "📈"
+        emoji = ""
         explicacao = (
             f"Os sinais técnicos sugerem que <strong>{nome_acao}</strong> pode estar em um "
             "momento favorável. O modelo identificou uma combinação de fatores "
@@ -1628,7 +1336,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     elif sinal == "venda":
         resposta_curta = "Talvez seja melhor ter cautela"
         cor_classe = "alert-banner-sell"
-        emoji = "📉"
+        emoji = ""
         explicacao = (
             f"Os sinais técnicos sugerem que <strong>{nome_acao}</strong> pode estar em um "
             "momento de risco. O modelo identificou indicadores que "
@@ -1637,7 +1345,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     else:
         resposta_curta = "Sem sinal claro no momento"
         cor_classe = "alert-banner-neutral"
-        emoji = "🤔"
+        emoji = ""
         explicacao = (
             f"Os indicadores de <strong>{nome_acao}</strong> estão equilibrados. "
             "Não há sinal forte de alta nem de baixa nas últimas semanas. "
@@ -1699,7 +1407,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
         """, unsafe_allow_html=True)
 
     # ── GRÁFICO SIMPLES ─────────────────────────────────────────────────
-    st.markdown("### 📊 Como a ação se comportou ao longo do tempo?")
+    st.markdown("### Como a ação se comportou ao longo do tempo?")
 
     periodo_label = st.selectbox(
         "Período do gráfico:", list(PERIODOS_GRAFICO.keys()),
@@ -1709,7 +1417,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     st.plotly_chart(fig, use_container_width=True)
 
     # ── BOX "O QUE ISSO SIGNIFICA?" ──────────────────────────────────────
-    st.markdown("### 💡 O que isso significa pra mim?")
+    st.markdown("### O que isso significa pra mim?")
 
     if sinal == "compra":
         texto_significa = (
@@ -1746,7 +1454,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     st.markdown(texto_significa)
 
     # ── HISTÓRICO RECENTE EM LINGUAGEM SIMPLES ───────────────────────────
-    st.markdown("### 📰 O que aconteceu nas últimas semanas?")
+    st.markdown("### O que aconteceu nas últimas semanas?")
 
     # Pega os últimos 3 sinais que não foram neutros
     sinais_recentes = []
@@ -1763,12 +1471,12 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
             preco = linha["close"]
             if s == "compra":
                 st.markdown(
-                    f"🟢  **{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
+                    f"**{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
                     "um possível ponto de entrada (sinal de compra)."
                 )
             else:
                 st.markdown(
-                    f"🔴  **{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
+                    f"**{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
                     "um possível ponto de saída (sinal de venda)."
                 )
     else:
@@ -1777,7 +1485,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     # ── AVISO IMPORTANTE ────────────────────────────────────────────────
     st.markdown("---")
     st.warning(
-        "⚠️  **Importante:** este sistema é uma ferramenta de **apoio à decisão**, "
+        "**Importante:** este sistema é uma ferramenta de **apoio à decisão**, "
         "baseada em análise técnica histórica e Machine Learning. **Não constitui "
         "recomendação de investimento**. Toda decisão de investir envolve riscos. "
         "Considere consultar um profissional credenciado (CVM) antes de tomar "
@@ -1785,7 +1493,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
     )
 
     # ── CHAMADA PARA MODO EXPERT ────────────────────────────────────────
-    with st.expander("📊  Quer ver a análise técnica completa?"):
+    with st.expander("Quer ver a análise técnica completa?"):
         st.markdown(
             "O **Painel Avançado** mostra todos os indicadores técnicos brutos (RSI, MACD, "
             "Bandas de Bollinger, Médias Móveis), as métricas dos modelos de "
@@ -1793,7 +1501,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
             "estatística da previsão e as três projeções (cenário otimista, "
             "esperado e pessimista). É indicado para quem já tem familiaridade "
             "com análise técnica de ativos.\n\n"
-            "👉  Para acessar, clique em **📊 Painel Avançado** na barra lateral à esquerda."
+            "Para acessar, clique em **Painel Avançado** na barra lateral à esquerda."
         )
 
 
@@ -1882,7 +1590,7 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
     df_previsao = previsao_lstm_demo(df_ticker, dias_previsao)
     preco_previsto = float(df_previsao["previsao"].iloc[0]) if not df_previsao.empty else float(ultimo["close"])
 
-    st.markdown(f'<div class="page-title">🔍 Análise Detalhada — {ticker}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="page-title">Análise Detalhada — {ticker}</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="page-subtitle">{TICKERS_INFO[ticker]["nome"]} • '
         f'Última atualização: {ultimo["data"].strftime("%d/%m/%Y")}</div>',
@@ -1904,7 +1612,7 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
     col3.metric("Volume hoje", f"{ultimo['volume']/1e6:.1f}M")
     col4.metric("Previsão", f"R$ {preco_previsto:.2f}", f"{(preco_previsto-ultimo['close'])/ultimo['close']*100:+.2f}%")
 
-    st.markdown("### 📊 Indicadores técnicos")
+    st.markdown("### Indicadores técnicos")
 
     # Cards de indicadores
     rsi_val = ultimo.get("rsi_14", np.nan)
@@ -1971,7 +1679,7 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
     )
 
     # Cenários de predição
-    st.markdown("### 🔮 Cenários de predição (próximos pregões)")
+    st.markdown("### Cenários de predição (próximos pregões)")
     col_o, col_e, col_p = st.columns(3)
     preco_ult = float(ultimo["close"])
     preco_med = float(df_previsao["previsao"].iloc[-1]) if not df_previsao.empty else preco_ult
@@ -2005,17 +1713,17 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
 
 
 def tela_alertas(df: pd.DataFrame) -> None:
-    st.markdown('<div class="page-title">🔔 Centro de Alertas</div>', unsafe_allow_html=True)
+    st.markdown('<div class="page-title">Centro de Alertas</div>', unsafe_allow_html=True)
     st.markdown(
         '<div class="page-subtitle">Histórico e notificações de sinais — entrega prevista para o TC II</div>',
         unsafe_allow_html=True,
     )
 
     st.markdown("""
-    <div style="background:linear-gradient(135deg, #2d1a4a 0%, #1a1530 100%);
-                border:1px solid #6b21a8; border-radius:12px; padding:48px 32px;
+    <div style="background:#161a23;
+                border:1px solid #1f2430; border-radius:12px; padding:48px 32px;
                 text-align:center; margin-top:8px;">
-        <span class="economia-badge">🚧 EM DESENVOLVIMENTO · TC II</span>
+        <span class="economia-badge">EM DESENVOLVIMENTO · TC II</span>
         <h2 style="color:#f1f5f9; margin-top:16px; font-size:24px;">Central de Alertas em construção</h2>
         <p style="color:#cbd5e1; line-height:1.7; margin-top:8px; font-size:14px;">
             O histórico de alertas e o envio de notificações de compra e venda
@@ -2030,8 +1738,8 @@ def tela_alertas(df: pd.DataFrame) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 def main() -> None:
     st.set_page_config(
-        page_title="B3 ML Advisor — TCC Kauan & Vitor",
-        page_icon="📈",
+        page_title="Econom-IA",
+        page_icon="",
         layout="wide",
         initial_sidebar_state="expanded",
     )
@@ -2045,20 +1753,15 @@ def main() -> None:
     # ── Sidebar ────────────────────────────────────────────────────────────
     with st.sidebar:
         st.markdown("""
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:24px;">
-            <div style="width:36px; height:36px; background:linear-gradient(135deg, #6366f1, #a855f7);
-                        border-radius:8px; display:flex; align-items:center; justify-content:center;
-                        font-weight:800; color:white; font-size:14px;">B3</div>
-            <div>
-                <div style="font-weight:700; color:#f1f5f9; font-size:15px;">ML Advisor</div>
-                <div style="font-size:11px; color:#64748b;">TCC · UNOESC 2026</div>
-            </div>
+        <div style="margin-bottom:24px;">
+            <div style="font-weight:700; color:#f1f5f9; font-size:20px;">Econom-IA</div>
+            <div style="font-size:11px; color:#64748b;">TCC - UNOESC 2026</div>
         </div>
         """, unsafe_allow_html=True)
 
         # ── Seção INÍCIO ─────────────────────────────────────
         st.markdown('<div class="sidebar-section-title">INÍCIO</div>', unsafe_allow_html=True)
-        if st.button("🏠  Visão Geral", key="btn_inicio",
+        if st.button("Visão Geral", key="btn_inicio",
                      use_container_width=True,
                      type="primary" if st.session_state.pagina_ativa == "inicio" else "secondary"):
             st.session_state.pagina_ativa = "inicio"
@@ -2066,12 +1769,12 @@ def main() -> None:
 
         # ── Seção ANÁLISE ────────────────────────────────────
         st.markdown('<div class="sidebar-section-title">ANÁLISE</div>', unsafe_allow_html=True)
-        if st.button("👁️  Painel Iniciante", key="btn_iniciante",
+        if st.button("Painel Iniciante", key="btn_iniciante",
                      use_container_width=True,
                      type="primary" if st.session_state.pagina_ativa == "iniciante" else "secondary"):
             st.session_state.pagina_ativa = "iniciante"
             st.rerun()
-        if st.button("📊  Painel Avançado", key="btn_avancado",
+        if st.button("Painel Avançado", key="btn_avancado",
                      use_container_width=True,
                      type="primary" if st.session_state.pagina_ativa == "avancado" else "secondary"):
             st.session_state.pagina_ativa = "avancado"
@@ -2079,17 +1782,17 @@ def main() -> None:
 
         # ── Seção FERRAMENTAS ────────────────────────────────
         st.markdown('<div class="sidebar-section-title">FERRAMENTAS</div>', unsafe_allow_html=True)
-        if st.button("🤖  EconomIA", key="btn_ia",
+        if st.button("EconomIA", key="btn_ia",
                      use_container_width=True,
                      type="primary" if st.session_state.pagina_ativa == "economia" else "secondary"):
             st.session_state.pagina_ativa = "economia"
             st.rerun()
-        if st.button("📈  Previsões & Macro", key="btn_previsoes",
+        if st.button("Previsões & Macro", key="btn_previsoes",
                      use_container_width=True,
                      type="primary" if st.session_state.pagina_ativa == "previsoes" else "secondary"):
             st.session_state.pagina_ativa = "previsoes"
             st.rerun()
-        if st.button("🔔  Alertas", key="btn_alertas",
+        if st.button("Alertas", key="btn_alertas",
                      use_container_width=True,
                      type="primary" if st.session_state.pagina_ativa == "alertas" else "secondary"):
             st.session_state.pagina_ativa = "alertas"
@@ -2100,7 +1803,7 @@ def main() -> None:
             """
             <div style="background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3);
                         padding:10px; border-radius:8px;">
-                <div style="font-size:12px; font-weight:700; color:#fbbf24;">⚠️ Aviso importante</div>
+                <div style="font-size:12px; font-weight:700; color:#fbbf24;">Aviso importante</div>
                 <div style="font-size:11px; color:#cbd5e1; margin-top:4px; line-height:1.5;">
                     Esta plataforma é educacional. Não constitui recomendação de investimento. Consulte um assessor.
                 </div>
@@ -2125,7 +1828,7 @@ def main() -> None:
 
     if df is None:
         st.error(
-            "⚠️ Nenhum arquivo de dados encontrado. Execute primeiro o script "
+            "Nenhum arquivo de dados encontrado. Execute primeiro o script "
             "`coleta_dados.py` (Fase 1) para gerar o dataset."
         )
         st.code("python src/01_coleta_dados.py", language="bash")
@@ -2142,9 +1845,9 @@ def main() -> None:
         if metricas:
             st.markdown(
                 f"""
-                <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3);
+                <div style="background:rgba(16,185,129,0.1); border:1px solid #1f2430;
                             padding:10px; border-radius:8px; margin-top:8px;">
-                    <div style="font-size:11px; font-weight:700; color:#10b981;">✓ Modelo treinado</div>
+                    <div style="font-size:11px; font-weight:700; color:#10b981;">Modelo treinado</div>
                     <div style="font-size:10px; color:#cbd5e1; margin-top:4px;">
                         F1 OOS: {metricas['resultados_oos']['f1_macro']:.3f} · {metricas['info_treinamento']['data_treinamento'][:10]}
                     </div>
@@ -2155,13 +1858,13 @@ def main() -> None:
         # Status / atualização dos dados de mercado
         ultima_data = df["data"].max()
         rotulo_modo = {
-            "online": "🟢 Dados ao vivo (Yahoo Finance)",
-            "features": "🟡 Dados locais (offline)",
-            "ohlcv": "🟡 Dados locais (offline)",
+            "online": "Dados ao vivo (Yahoo Finance)",
+            "features": "Dados locais (offline)",
+            "ohlcv": "Dados locais (offline)",
         }.get(modo, "Dados de mercado")
         st.markdown(
             f"""
-            <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3);
+            <div style="background:rgba(59,130,246,0.1); border:1px solid #1f2430;
                         padding:10px; border-radius:8px; margin-top:8px;">
                 <div style="font-size:11px; font-weight:700; color:#60a5fa;">{rotulo_modo}</div>
                 <div style="font-size:10px; color:#cbd5e1; margin-top:4px;">
@@ -2170,7 +1873,7 @@ def main() -> None:
             </div>
             """, unsafe_allow_html=True
         )
-        if st.button("🔄  Atualizar agora", key="btn_refresh", use_container_width=True):
+        if st.button("Atualizar agora", key="btn_refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
 
