@@ -1415,7 +1415,7 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
 
     periodo_label = st.selectbox(
         "Período do gráfico:", list(PERIODOS_GRAFICO.keys()),
-        index=3, key="periodo_iniciante",
+        index=1, key="periodo_iniciante",
     )
     fig = _grafico_simples_iniciante(df_ticker, df_previsao, ticker, PERIODOS_GRAFICO[periodo_label])
     st.plotly_chart(fig, use_container_width=True)
@@ -1677,7 +1677,7 @@ def tela_analise_expert(df: pd.DataFrame, modelos: dict) -> None:
     # Gráfico principal
     periodo_label = st.selectbox(
         "Período do gráfico:", list(PERIODOS_GRAFICO.keys()),
-        index=3, key="periodo_avancado",
+        index=1, key="periodo_avancado",
     )
     st.plotly_chart(
         grafico_principal(df_ticker, df_previsao, ticker, PERIODOS_GRAFICO[periodo_label]),
