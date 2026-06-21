@@ -1455,7 +1455,8 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
             "nas próximas semanas conforme novos dados forem incorporados."
         )
 
-    st.markdown(texto_significa)
+    with st.container(border=True):
+        st.markdown(texto_significa)
 
     # ── HISTÓRICO RECENTE EM LINGUAGEM SIMPLES ───────────────────────────
     st.markdown("### O que aconteceu nas últimas semanas?")
@@ -1470,19 +1471,20 @@ def tela_analise_iniciante(df: pd.DataFrame, modelos: dict) -> None:
             break
 
     if sinais_recentes:
-        for linha, s in sinais_recentes:
-            data_str = linha["data"].strftime("%d/%m/%Y")
-            preco = linha["close"]
-            if s == "compra":
-                st.markdown(
-                    f"**{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
-                    "um possível ponto de entrada (sinal de compra)."
-                )
-            else:
-                st.markdown(
-                    f"**{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
-                    "um possível ponto de saída (sinal de venda)."
-                )
+        with st.container(border=True):
+            for linha, s in sinais_recentes:
+                data_str = linha["data"].strftime("%d/%m/%Y")
+                preco = linha["close"]
+                if s == "compra":
+                    st.markdown(
+                        f"**{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
+                        "um possível ponto de entrada (sinal de compra)."
+                    )
+                else:
+                    st.markdown(
+                        f"**{data_str}** — Em R$ {preco:.2f}, o sistema identificou "
+                        "um possível ponto de saída (sinal de venda)."
+                    )
     else:
         st.info("Nas últimas semanas o sistema não identificou sinais claros.")
 
