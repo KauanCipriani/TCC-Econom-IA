@@ -72,8 +72,12 @@ FEATURES_MODELO = [
     "bb_position",
 ]
 
-DADOS_PATH = Path("dados")
-MODELOS_PATH = Path("modelos")
+# Caminhos relativos ao proprio arquivo, para funcionar tanto localmente
+# quanto em hospedagem (ex.: Streamlit Community Cloud), onde o diretorio de
+# trabalho e a raiz do repositorio.
+BASE_DIR = Path(__file__).resolve().parent
+DADOS_PATH = BASE_DIR / "dados"
+MODELOS_PATH = BASE_DIR / "modelos"
 ARQUIVO_FEATURES = DADOS_PATH / "b3_financeiro_features.parquet"
 ARQUIVO_OHLCV = DADOS_PATH / "b3_financeiro_ohlcv.parquet"
 
