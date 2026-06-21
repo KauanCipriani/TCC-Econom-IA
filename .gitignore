@@ -27,3 +27,6 @@ Thumbs.db
 # Logs / temporários
 *.log
 .cache/
+# Arquivos temporarios do Word/Office
+~$*
+*.tmp
