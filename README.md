@@ -1,4 +1,4 @@
-# 📈 B3 ML Advisor — Sistema de Apoio à Decisão
+# B3 ML Advisor — Sistema de Apoio à Decisão
 
 **TCC — Ciência da Computação | UNOESC São Miguel do Oeste — 2026**
 
@@ -9,7 +9,7 @@ Sistema computacional baseado em técnicas de Machine Learning para predição d
 
 ---
 
-## 🚀 Como rodar (Passo a Passo)
+## Como rodar (Passo a Passo)
 
 ### 1. Pré-requisitos
 
@@ -66,7 +66,7 @@ Pra parar: `Ctrl + C` no terminal.
 
 ---
 
-## 📁 Estrutura dos arquivos
+## Estrutura dos arquivos
 
 ```
 projeto_tcc/
@@ -89,30 +89,30 @@ projeto_tcc/
 
 ---
 
-## 🎯 O que o sistema faz
+## O que o sistema faz
 
 ### Telas disponíveis
 
 **INÍCIO**
-- 🏠 **Visão Geral** — Boas-vindas, índices macro, notícias, sinais consolidados
+- **Visão Geral** — Boas-vindas, índices macro, notícias, sinais consolidados
 
 **ANÁLISE**
-- 👁️ **Painel Iniciante** — Linguagem simples, pergunta direta, 3 cards básicos
-- 📊 **Painel Avançado** — RSI/MACD/Bollinger/SMA, gráfico técnico completo
+- **Painel Iniciante** — Linguagem simples, pergunta direta, 3 cards básicos
+- **Painel Avançado** — RSI/MACD/Bollinger/SMA, gráfico técnico completo
 
 **FERRAMENTAS**
-- 🤖 **EconomIA** — Assistente conversacional (responde 8+ tipos de perguntas)
-- 📈 **Previsões & Macro** — Polymarket Copom + Selic/IPCA/Fed/USD + Treasury Yields
-- 🔔 **Alertas** — Histórico de sinais
+- **EconomIA** — Assistente conversacional (responde 8+ tipos de perguntas)
+- **Previsões & Macro** — Polymarket Copom + Selic/IPCA/Fed/USD + Treasury Yields
+- **Alertas** — Histórico de sinais
 
 **SISTEMA**
-- 📈 **Performance** — Métricas reais lidas de `modelos/metricas.json`
-- 🗄️ **Dados & Modelos** — Transparência arquitetural do projeto
-- ℹ️ **Sobre o Projeto** — Informações institucionais
+- **Performance** — Métricas reais lidas de `modelos/metricas.json`
+- **Dados & Modelos** — Transparência arquitetural do projeto
+- **Sobre o Projeto** — Informações institucionais
 
 ---
 
-## 🔄 Retreinar o modelo (opcional)
+## Retreinar o modelo (opcional)
 
 Se quiser executar novamente o treinamento (gera nova `metricas.json`):
 
@@ -136,7 +136,7 @@ A interface **atualiza automaticamente** todos os painéis de performance quando
 
 ---
 
-## ⚠️ Problemas comuns
+## Problemas comuns
 
 ### "streamlit não é reconhecido como comando"
 → O ambiente virtual não foi ativado. Verifique que aparece `(venv)` no terminal.
@@ -158,7 +158,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ---
 
-## 📊 Resultados obtidos no treinamento
+## Resultados obtidos no treinamento
 
 **Métricas reais (Random Forest)**
 
@@ -176,7 +176,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ---
 
-## 📚 Tecnologias utilizadas
+## Tecnologias utilizadas
 
 - **Python 3.10+** — linguagem principal
 - **Streamlit** — framework web para a interface
@@ -189,6 +189,6 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ---
 
-## ⚖️ Aviso legal
+## Aviso legal
 
 Este sistema é uma **ferramenta de apoio à decisão de natureza acadêmica**, baseada em análise técnica histórica e Machine Learning. **Não constitui recomendação de investimento.** Toda decisão de investir envolve riscos. Consulte um profissional credenciado pela CVM antes de tomar decisões financeiras.
