@@ -30,3 +30,4 @@ Thumbs.db
 # Arquivos temporarios do Word/Office
 ~$*
 *.tmp
+*.docx
